@@ -1,0 +1,18 @@
+# ICSLab FPGA Programmer - boards shown at the top of the "Board" list.
+#
+# One board per line:   <openFPGALoader board name> [= <label shown to students>]
+# Board names must match "openFPGALoader --list-boards" (all other supported
+# boards are still listed below these). Lines starting with # are ignored.
+# Edit this file to match the boards of your laboratory; no rebuild needed.
+
+basys3        = Digilent Basys 3
+nexys_a7_100  = Digilent Nexys A7-100T
+nexys_a7_50   = Digilent Nexys A7-50T
+nexysVideo    = Digilent Nexys Video
+arty_a7_35t   = Digilent Arty A7-35T
+arty_a7_100t  = Digilent Arty A7-100T
+zybo_z7_20    = Digilent Zybo Z7-20
+cmoda7_35t    = Digilent Cmod A7-35T
+de10lite      = Terasic DE10-Lite
+de0nano       = Terasic DE0-Nano
+tangnano9k    = Sipeed Tang Nano 9K

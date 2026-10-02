@@ -1,0 +1,168 @@
+name: ICSLab FPGA Programmer - Windows release
+
+on:
+  push:
+    branches: ['**']
+    tags: ['icslab-v*']
+    paths:
+      - 'ICSLab-FPGA-Programmer/**'
+      - 'src/**'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - '.github/workflows/windows-release.yml'
+  pull_request:
+    paths:
+      - 'ICSLab-FPGA-Programmer/**'
+      - 'src/**'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - '.github/workflows/windows-release.yml'
+  workflow_dispatch:
+    inputs:
+      ofl_source:
+        description: 'openFPGALoader sources: "pin" (use ICSLab-FPGA-Programmer/openfpgaloader.pin), "local" or "upstream"'
+        default: 'pin'
+        required: true
+      ofl_ref:
+        description: 'Upstream tag or full commit SHA (only for ofl_source=upstream)'
+        default: ''
+        required: false
+
+permissions:
+  contents: write   # only used to attach files to a release on tag push
+
+jobs:
+  build:
+    name: Cross-build (MinGW-w64)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install MinGW-w64 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            mingw-w64 libz-mingw-w64-dev cmake ninja-build pkg-config p7zip-full zip file
+
+      - name: Select openFPGALoader version
+        run: |
+          src="${{ github.event.inputs.ofl_source || 'pin' }}"
+          if [ "$src" != "pin" ]; then
+            echo "OFL_SOURCE=$src" >> "$GITHUB_ENV"
+            echo "OFL_REF=${{ github.event.inputs.ofl_ref }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: Build backend + GUI, package release
+        env:
+          RUN_TESTS: '0'            # Windows tests run natively in the next job
+          CORRESPONDING_SOURCE: '1'
+        run: ICSLab-FPGA-Programmer/scripts/build-release.sh
+
+      - name: Upload release
+        uses: actions/upload-artifact@v4
+        with:
+          name: ICSLab-FPGA-Programmer-win64
+          path: |
+            ICSLab-FPGA-Programmer/release/*.zip
+            ICSLab-FPGA-Programmer/release/SHA256SUMS.txt
+            ICSLab-FPGA-Programmer/release/dependencies.txt
+
+      - name: Upload test binaries
+        uses: actions/upload-artifact@v4
+        with:
+          name: tests-win64
+          path: |
+            ICSLab-FPGA-Programmer/build-release/gui/icslab_tests.exe
+            ICSLab-FPGA-Programmer/build-release/gui/fake_openfpgaloader.exe
+
+  test-windows:
+    name: Test on Windows
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ICSLab-FPGA-Programmer-win64
+          path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: tests-win64
+          path: tests
+
+      - name: Extract portable ZIP (into a path with spaces)
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist\ICSLab-FPGA-Programmer-v*-win64.zip | Select-Object -First 1
+          Expand-Archive $zip.FullName -DestinationPath "C:\Lab Test\Student Name"
+          Get-ChildItem -Recurse "C:\Lab Test\Student Name" | Select-Object -First 30 FullName
+
+      - name: Unit + process + backend integration tests
+        shell: pwsh
+        run: |
+          $backend = "C:\Lab Test\Student Name\ICSLab-FPGA-Programmer\backend\openFPGALoader.exe"
+          & tests\icslab_tests.exe $backend
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Backend smoke test
+        shell: pwsh
+        run: |
+          $backend = "C:\Lab Test\Student Name\ICSLab-FPGA-Programmer\backend\openFPGALoader.exe"
+          & $backend --Version
+          & $backend --list-boards | Select-Object -First 5
+          $global:LASTEXITCODE = 0
+
+      - name: GUI starts and stays responsive
+        shell: pwsh
+        run: |
+          $exe = "C:\Lab Test\Student Name\ICSLab-FPGA-Programmer\ICSLab FPGA Programmer.exe"
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 8
+          $p.Refresh()
+          if ($p.HasExited) { Write-Error "GUI exited with code $($p.ExitCode)"; exit 1 }
+          if (-not $p.Responding) { Write-Error "GUI is not responding"; exit 1 }
+          Write-Host "GUI running, window title: $($p.MainWindowTitle)"
+          Stop-Process -Id $p.Id
+
+  installer:
+    name: Optional installer (Inno Setup)
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ICSLab-FPGA-Programmer-win64
+          path: ICSLab-FPGA-Programmer/release
+      - name: Build Setup.exe
+        shell: pwsh
+        run: |
+          Set-Location ICSLab-FPGA-Programmer
+          $zip = Get-ChildItem release\ICSLab-FPGA-Programmer-v*-win64.zip | Select-Object -First 1
+          Expand-Archive $zip.FullName -DestinationPath release -Force
+          $ver = ($zip.Name -replace '^ICSLab-FPGA-Programmer-v(.*)-win64\.zip$', '$1')
+          if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) {
+            choco install innosetup --no-progress -y
+            $env:Path += ";${env:ProgramFiles(x86)}\Inno Setup 6"
+          }
+          iscc /DAppVersion=$ver installer\icslab-fpga-programmer.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ICSLab-FPGA-Programmer-Setup
+          path: ICSLab-FPGA-Programmer/release/ICSLab-FPGA-Programmer-Setup.exe
+
+  publish:
+    name: Attach to GitHub release
+    if: startsWith(github.ref, 'refs/tags/icslab-v')
+    needs: [build, test-windows, installer]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            out/*.zip
+            out/*.exe
+            out/SHA256SUMS.txt

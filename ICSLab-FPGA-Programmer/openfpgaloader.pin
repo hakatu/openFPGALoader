@@ -1,0 +1,13 @@
+# openFPGALoader version packaged as backend\openFPGALoader.exe
+#
+# OFL_SOURCE=local    : build the openFPGALoader sources of this repository
+#                       (the parent directory). The pin is the git commit.
+# OFL_SOURCE=upstream : clone https://github.com/trabucayre/openFPGALoader at
+#                       OFL_REF (a tag such as v1.1.1 or a full commit SHA)
+#                       and apply patches/*.patch.
+#
+# To update the backend deliberately: change these values (or sync this
+# fork with upstream), rebuild, run the tests, and commit the change.
+OFL_SOURCE=local
+OFL_REF=
+OFL_UPSTREAM_URL=https://github.com/trabucayre/openFPGALoader.git

@@ -52,3 +52,6 @@ build/
 
 # NOTE: excluded because GitHub rejects push containing this blob (HTTP 400)
 spiOverJtag/spiOverJtag_efinix_ti375n484.bit.gz
+
+# Windows cross-build outputs
+/build-win64-cross/
