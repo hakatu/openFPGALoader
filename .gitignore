@@ -47,4 +47,8 @@ build/
 /doc/compatibility/fpga.inc
 
 # VSCode local settings directory
-/.vscode/.DS_Store
+/.vscode/
+.DS_Store
+
+# NOTE: excluded because GitHub rejects push containing this blob (HTTP 400)
+spiOverJtag/spiOverJtag_efinix_ti375n484.bit.gz
