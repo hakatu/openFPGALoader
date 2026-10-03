@@ -34,6 +34,7 @@ openFPGALoader
 | Problem | What to do |
 |---|---|
 | **Board not detected** ("Unable to communicate with the FPGA programmer") | Check the USB cable (PROG/JTAG port), the power switch, and try another USB port. Click **Detect Board**. |
+| **Intel USB-Blaster with a yellow mark** in Device Manager (DE2 boards, Windows 11) | Instructor: **USB Setup...** > **Install WinUSB driver**. |
 | **USB driver issue** ("Windows blocks access to the programmer") | The programmer needs the WinUSB driver. Ask your instructor ([docs/windows-driver.md](docs/windows-driver.md)). Close Vivado/Quartus Hardware Manager. |
 | **Wrong board selected** | Choose *Auto Detect / Generic JTAG*, click **Detect Board** and use the *Possible board* shown. |
 | **Malformed bitstream** ("The bitstream file is not valid") | Select the generated bitstream (Vivado: `<project>.runs/impl_1/<top>.bit`), check that generation succeeded and targets your FPGA. |
@@ -47,6 +48,8 @@ openFPGALoader
 | ![no hardware](docs/screenshots/02-no-hardware.png) | ![detect + details](docs/screenshots/03-detect-details.png) |
 | ![flash confirmation](docs/screenshots/04-flash-confirm.png) | ![backend missing](docs/screenshots/05-backend-missing.png) |
 
+| ![USB Setup](docs/screenshots/06-usb-setup.png) | ![DE2-Standard, firmware missing](docs/screenshots/07-de2-standard.png) |
+
 (Screenshots taken under Wine. On Windows the controls use the native Windows 10/11 theme.)
 
 ## For lab instructors
@@ -59,7 +62,11 @@ openFPGALoader
   boards appear first. All boards supported by openFPGALoader
   (`openFPGALoader --list-boards`, read at runtime) are listed below them.
 * **USB drivers:** read [docs/windows-driver.md](docs/windows-driver.md)
-  before the first lab session.
+  before the first lab session. For Intel USB-Blaster / USB-Blaster II boards
+  (DE2, DE10, ...) whose Quartus driver shows a yellow mark on Windows 11,
+  click **USB Setup...** > **Install WinUSB driver** once per PC (binds the
+  WinUSB driver built into Windows; USB-Blaster II firmware
+  `blaster_6810.hex` is located automatically in the Quartus installation).
 * **Settings** (last board, mode, folder) are stored per user in
   `%APPDATA%\ICSLab\FPGA Programmer\settings.ini`. The last *file* is never
   remembered and nothing is ever programmed without a click on
@@ -104,6 +111,7 @@ ICSLab-FPGA-Programmer/
 │   ├── OpenFPGALoaderBackend.cpp/.h  command generation, quoting, output parsing,
 │   │                              error mapping (portable, unit tested)
 │   ├── ProcessRunner.cpp/.h       child process + pipes (Windows)
+│   ├── DriverSetup.cpp/.h         USB-Blaster status, WinUSB setup (elevated), firmware lookup
 │   └── Settings.cpp/.h            %APPDATA% settings
 ├── resources/                     icon, manifest, version info, README.txt, lab-boards.txt
 ├── tests/                         unit/process tests + fake openFPGALoader

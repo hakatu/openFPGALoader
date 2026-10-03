@@ -29,11 +29,15 @@ struct BoardInfo {
 std::vector<BoardInfo> parseBoardList(const std::string &listBoardsOutput);
 std::vector<std::string> parseCableList(const std::string &listCablesOutput);
 
-// Lab board list: one entry per line, "boardName" or "boardName = Friendly
-// name". '#' starts a comment. Unknown names are kept (the backend decides).
+// Lab board list: one entry per line,
+//   boardName [= Friendly name] [| cable=<cable name>]
+// '#' starts a comment. boardName is an openFPGALoader board ("-b") or, when
+// openFPGALoader has no entry for the board, any identifier combined with
+// "cable=" (the GUI then only passes "-c <cable>").
 struct LabBoard {
 	std::string name;
 	std::string label;
+	std::string cable; // optional cable override / cable-only board
 };
 std::vector<LabBoard> parseLabBoards(const std::string &text);
 std::vector<LabBoard> defaultLabBoards();
@@ -52,13 +56,15 @@ struct ProgramRequest {
 	std::string cable;     // empty: board default / backend default
 	std::string bitstream; // full path to bitstream
 	ProgramTarget target = ProgramTarget::Sram;
+	std::string probeFirmware; // USB-Blaster II FX2 firmware (blaster_6810.hex)
 };
 
 std::vector<std::string> buildListBoardsArgs();
 std::vector<std::string> buildListCablesArgs();
 std::vector<std::string> buildVersionArgs();
 std::vector<std::string> buildScanUsbArgs();
-std::vector<std::string> buildDetectArgs(const std::string &board, const std::string &cable);
+std::vector<std::string> buildDetectArgs(const std::string &board, const std::string &cable,
+	const std::string &probeFirmware = std::string());
 std::vector<std::string> buildProgramArgs(const ProgramRequest &req);
 
 /* ------------------------------------------------------------------------ */
@@ -153,6 +159,38 @@ std::vector<std::string> boardsMatchingModel(const std::vector<BoardInfo> &board
 	const std::string &model);
 
 /* ------------------------------------------------------------------------ */
+/* Intel/Altera USB-Blaster support                                         */
+/* ------------------------------------------------------------------------ */
+
+constexpr uint16_t kIntelVid = 0x09FB;
+constexpr uint16_t kBlasterPid = 0x6001;        // USB-Blaster
+constexpr uint16_t kBlasterIIColdPid = 0x6010;  // USB-Blaster II, no firmware yet
+constexpr uint16_t kBlasterIIPid = 0x6810;      // USB-Blaster II, firmware loaded
+
+// "USB\VID_09FB&PID_6010&REV_0001" -> vid/pid; mi = interface or -1.
+bool parseUsbHardwareId(const std::string &hwid, uint16_t &vid, uint16_t &pid, int &mi);
+bool isIntelBlaster(uint16_t vid, uint16_t pid);
+// openFPGALoader cable name for an Intel blaster ("" when not a blaster).
+std::string blasterCableName(uint16_t vid, uint16_t pid);
+std::string blasterDisplayName(uint16_t vid, uint16_t pid);
+// USB-Blaster II needs Intel's FX2 firmware file passed with --probe-firmware.
+bool cableNeedsBlasterFirmware(const std::string &cable);
+const char *blasterFirmwareFileName(); // "blaster_6810.hex"
+
+// Candidate locations of blaster_6810.hex, most preferred first:
+// the instructor's choice, <app>\firmware, $QUARTUS_ROOTDIR, then every
+// Quartus / Quartus Programmer installation directory given.
+std::vector<std::string> blasterFirmwareCandidates(const std::string &exeDir,
+	const std::string &configuredPath, const std::string &quartusRootDir,
+	const std::vector<std::string> &quartusVersionDirs);
+// Base folders that contain Quartus versions (C:\intelFPGA_lite, ...).
+std::vector<std::string> quartusInstallRoots(const std::string &systemDrive);
+
+// Windows Device Manager problem code (CM_PROB_*) -> short explanation.
+std::string describeDeviceProblem(unsigned long problemCode);
+bool isWinUsbService(const std::string &service);
+
+/* ------------------------------------------------------------------------ */
 /* Result interpretation                                                    */
 /* ------------------------------------------------------------------------ */
 
@@ -167,6 +205,7 @@ enum class FailureKind {
 	BadBitstream,   // cannot open / parse bitstream
 	FlashFailed,    // flash erase/write/verify failed
 	MultipleFpga,
+	BlasterFirmware, // USB-Blaster II firmware missing
 	Unknown,
 };
 

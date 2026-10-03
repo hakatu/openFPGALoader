@@ -50,9 +50,9 @@ Only change the **JTAG interface** of the programmer. Never change the UART
 | USB-Blaster II boards (`de10nano`, `de1Soc`, …) | `09FB:6010` (before firmware) / `09FB:6810` | **"USB-Blaster II"** (both IDs) | WinUSB | n/a |
 
 USB-Blaster II also needs Intel's firmware file (`blaster_6810.hex` from a
-Quartus installation, passed with `--probe-firmware`). The simple mode of
-ICSLab FPGA Programmer does not provide this option, so USB-Blaster II boards
-are not supported by this first release.
+Quartus installation); ICSLab FPGA Programmer passes it automatically
+(`--probe-firmware`), see the USB Setup section above. For Intel blasters,
+prefer the built-in **USB Setup...** over Zadig.
 
 How to tell what the programmer is: on the affected PC, open ICSLab FPGA
 Programmer, click **Detect Board**, then **Show Details**. The
@@ -61,6 +61,51 @@ openFPGALoader can see.
 
 Check the USB ID in Zadig before replacing anything. If the ID doesn't
 match the table, stop.
+
+## Intel USB-Blaster / USB-Blaster II (DE2, DE10, DE0 ...): built-in "USB Setup"
+
+On Windows 11, the USB-Blaster drivers installed by Quartus often show a
+yellow exclamation mark in Device Manager even after installation (the
+driver is blocked or rejected by Windows). ICSLab FPGA Programmer does not
+use Intel's driver: it needs **WinUSB**, which is part of Windows and signed
+by Microsoft, so it is not affected by that problem.
+
+1. Connect the board (USB-Blaster port) and switch it on.
+2. Open ICSLab FPGA Programmer and click **USB Setup...** (bottom right).
+   The list shows each blaster, its USB ID and the Windows driver status
+   (including the Device Manager error code, e.g. *code 52: Windows cannot
+   verify the driver's digital signature*).
+3. **USB-Blaster II only:** the *firmware* field must show
+   `blaster_6810.hex`. It is found automatically in Quartus / Quartus
+   Programmer installations (`C:\intelFPGA*\<version>\...`); otherwise click
+   **Locate...** and select it. Lab tip: copy the file into the `firmware`
+   folder next to `ICSLab FPGA Programmer.exe` so every user of the PC finds
+   it. (Intel's file is not included in this package.)
+4. Click **Install WinUSB driver** and accept the Windows administrator
+   prompt. For a USB-Blaster II the application then loads the firmware once
+   and configures the second USB ID (09FB:6810) as well.
+5. Close the dialog and click **Detect Board**.
+
+What it does: it selects the inbox driver *Universal Serial Bus devices >
+WinUsb Device* (`%SystemRoot%\INF\winusb.inf`) for the blaster only, exactly
+as you could do by hand in Device Manager. No driver package or certificate
+is added to Windows.
+
+**Restore original driver** uninstalls the WinUSB binding of the connected
+blasters; Windows then re-installs its default (Intel) driver, for Quartus.
+
+If the automatic setup reports an error, do the same by hand: Device Manager
+> right-click the USB-Blaster > *Update driver* > *Browse my computer* >
+*Let me pick from a list* > *Universal Serial Bus devices* > *WinUsb Device*
+> *Next* (accept the warning). For a USB-Blaster II, repeat after the first
+**Detect Board** for the second device that appears.
+
+The driver choice is stored per USB device instance: plugging the same
+board into another USB port may require running the setup again.
+
+**Not yet validated on hardware:** the USB Setup function was developed
+without access to a DE2 board or a Windows 11 PC. Try it on one lab PC
+first; the manual procedure above is the fallback.
 
 ## Installing WinUSB with Zadig (administrator rights required)
 

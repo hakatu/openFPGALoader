@@ -31,8 +31,9 @@ Your FPGA must already be working in SRAM mode before you try Flash mode.
 ## Which file do I select?
 
 * **Vivado** (Xilinx/AMD): `<project>.runs/impl_1/<top>.bit`
-* **Quartus** (Intel): `output_files/<top>.sof` is not supported directly;
-  use the `.svf` or `.rbf` export your instructor indicates.
+* **Quartus** (Intel, e.g. DE2 boards): `.sof` files are not supported.
+  In Quartus use *File > Convert Programming Files* to create a `.rbf`
+  (or export a `.svf`), as your instructor indicates.
 * **Gowin**: `impl/pnr/<project>.fs`
 
 ## Detect Board

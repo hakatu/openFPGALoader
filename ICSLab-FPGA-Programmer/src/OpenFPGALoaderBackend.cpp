@@ -117,6 +117,19 @@ std::vector<LabBoard> parseLabBoards(const std::string &text)
 		if (line.empty())
 			continue;
 		LabBoard lb;
+		auto bar = line.find('|');
+		if (bar != std::string::npos) {
+			std::string opts = line.substr(bar + 1);
+			line = trim(line.substr(0, bar));
+			std::istringstream iss(opts);
+			std::string opt;
+			while (std::getline(iss, opt, '|')) {
+				opt = trim(opt);
+				auto oeq = opt.find('=');
+				if (oeq != std::string::npos && trim(opt.substr(0, oeq)) == "cable")
+					lb.cable = trim(opt.substr(oeq + 1));
+			}
+		}
 		auto eq = line.find('=');
 		if (eq == std::string::npos) {
 			lb.name = line;
@@ -177,7 +190,9 @@ std::vector<LabBoard> defaultLabBoards()
 		"de10lite\n"
 		"de0nano\n"
 		"tangnano9k\n"
-		"cmoda7_35t\n");
+		"cmoda7_35t\n"
+		"de2_standard = Terasic DE2-Standard | cable=usb-blasterII\n"
+		"de2_115 = Terasic DE2-115 | cable=usb-blaster\n");
 }
 
 /* ------------------------------------------------------------------------ */
@@ -202,10 +217,20 @@ static void appendTargetArgs(std::vector<std::string> &args, const std::string &
 	}
 }
 
-std::vector<std::string> buildDetectArgs(const std::string &board, const std::string &cable)
+static void appendFirmwareArgs(std::vector<std::string> &args, const std::string &fw)
+{
+	if (!fw.empty()) {
+		args.push_back("--probe-firmware");
+		args.push_back(fw);
+	}
+}
+
+std::vector<std::string> buildDetectArgs(const std::string &board, const std::string &cable,
+	const std::string &probeFirmware)
 {
 	std::vector<std::string> args;
 	appendTargetArgs(args, board, cable);
+	appendFirmwareArgs(args, probeFirmware);
 	args.push_back("--detect");
 	return args;
 }
@@ -214,6 +239,7 @@ std::vector<std::string> buildProgramArgs(const ProgramRequest &req)
 {
 	std::vector<std::string> args;
 	appendTargetArgs(args, req.board, req.cable);
+	appendFirmwareArgs(args, req.probeFirmware);
 	// Explicit mode: never rely on backend defaults (SPI-mode boards would
 	// otherwise default to flash).
 	if (req.target == ProgramTarget::Flash)
@@ -655,6 +681,145 @@ std::vector<std::string> boardsMatchingModel(const std::vector<BoardInfo> &board
 }
 
 /* ------------------------------------------------------------------------ */
+/* Intel/Altera USB-Blaster support                                         */
+/* ------------------------------------------------------------------------ */
+
+static bool parseHexField(const std::string &s, const std::string &key, unsigned long &out)
+{
+	auto pos = s.find(key);
+	if (pos == std::string::npos)
+		return false;
+	pos += key.size();
+	size_t end = pos;
+	while (end < s.size() && std::isxdigit(static_cast<unsigned char>(s[end])))
+		++end;
+	if (end == pos)
+		return false;
+	out = std::strtoul(s.substr(pos, end - pos).c_str(), nullptr, 16);
+	return true;
+}
+
+bool parseUsbHardwareId(const std::string &hwid, uint16_t &vid, uint16_t &pid, int &mi)
+{
+	const std::string up = [&] {
+		std::string u = hwid;
+		for (auto &ch : u)
+			ch = static_cast<char>(std::toupper(static_cast<unsigned char>(ch)));
+		return u;
+	}();
+	if (up.rfind("USB\\", 0) != 0)
+		return false;
+	unsigned long v = 0, p = 0, m = 0;
+	if (!parseHexField(up, "VID_", v) || !parseHexField(up, "PID_", p))
+		return false;
+	vid = static_cast<uint16_t>(v);
+	pid = static_cast<uint16_t>(p);
+	mi = parseHexField(up, "&MI_", m) ? static_cast<int>(m) : -1;
+	return true;
+}
+
+bool isIntelBlaster(uint16_t vid, uint16_t pid)
+{
+	return vid == kIntelVid &&
+		(pid == kBlasterPid || pid == kBlasterIIColdPid || pid == kBlasterIIPid);
+}
+
+std::string blasterCableName(uint16_t vid, uint16_t pid)
+{
+	if (vid != kIntelVid)
+		return std::string();
+	if (pid == kBlasterPid)
+		return "usb-blaster";
+	if (pid == kBlasterIIColdPid || pid == kBlasterIIPid)
+		return "usb-blasterII";
+	return std::string();
+}
+
+std::string blasterDisplayName(uint16_t vid, uint16_t pid)
+{
+	if (vid == kIntelVid && pid == kBlasterPid)
+		return "USB-Blaster (09FB:6001)";
+	if (vid == kIntelVid && pid == kBlasterIIColdPid)
+		return "USB-Blaster II, firmware not loaded (09FB:6010)";
+	if (vid == kIntelVid && pid == kBlasterIIPid)
+		return "USB-Blaster II (09FB:6810)";
+	char buf[32];
+	snprintf(buf, sizeof(buf), "USB device %04X:%04X", vid, pid);
+	return buf;
+}
+
+bool cableNeedsBlasterFirmware(const std::string &cable)
+{
+	return cable == "usb-blasterII";
+}
+
+const char *blasterFirmwareFileName() { return "blaster_6810.hex"; }
+
+std::vector<std::string> quartusInstallRoots(const std::string &systemDrive)
+{
+	std::string d = systemDrive.empty() ? std::string("C:") : systemDrive;
+	if (!d.empty() && isPathSeparator(d.back()))
+		d.pop_back();
+	std::vector<std::string> roots;
+	for (const char *n : {"intelFPGA_lite", "intelFPGA", "intelFPGA_pro", "intelFPGA_standard",
+			"altera_lite", "altera", "altera_pro"})
+		roots.push_back(d + "\\" + n);
+	return roots;
+}
+
+std::vector<std::string> blasterFirmwareCandidates(const std::string &exeDir,
+	const std::string &configuredPath, const std::string &quartusRootDir,
+	const std::vector<std::string> &quartusVersionDirs)
+{
+	const std::string f = blasterFirmwareFileName();
+	std::vector<std::string> out;
+	auto add = [&](const std::string &p) {
+		if (!p.empty() && std::find(out.begin(), out.end(), p) == out.end())
+			out.push_back(p);
+	};
+	add(configuredPath);
+	add(joinPath(joinPath(exeDir, "firmware"), f));
+	auto addTool = [&](const std::string &toolDir) {
+		for (const char *sub : {"bin64", "linux64", "bin"})
+			add(joinPath(joinPath(toolDir, sub), f));
+		add(joinPath(joinPath(joinPath(toolDir, "drivers"), "usb-blaster-ii"), f));
+	};
+	if (!quartusRootDir.empty())
+		addTool(quartusRootDir);
+	for (const auto &v : quartusVersionDirs) {
+		addTool(joinPath(v, "quartus"));
+		addTool(joinPath(v, "qprogrammer"));
+	}
+	return out;
+}
+
+std::string describeDeviceProblem(unsigned long code)
+{
+	switch (code) {
+	case 0:  return "working";
+	case 1:  return "code 1: not configured correctly";
+	case 10: return "code 10: the device cannot start";
+	case 18: return "code 18: the driver must be reinstalled";
+	case 22: return "code 22: the device is disabled";
+	case 28: return "code 28: no driver is installed";
+	case 31: return "code 31: Windows cannot load the driver";
+	case 37: return "code 37: the driver failed to initialise";
+	case 39: return "code 39: the driver is missing, corrupted or blocked "
+		"(often Memory Integrity / Core Isolation)";
+	case 43: return "code 43: the device reported a problem";
+	case 45: return "code 45: the device is not connected";
+	case 48: return "code 48: the driver is blocked because of known compatibility issues";
+	case 52: return "code 52: Windows cannot verify the driver's digital signature";
+	default: return "code " + std::to_string(code) + ": the driver is not working";
+	}
+}
+
+bool isWinUsbService(const std::string &service)
+{
+	return toLower(service) == "winusb";
+}
+
+/* ------------------------------------------------------------------------ */
 /* Result interpretation                                                    */
 /* ------------------------------------------------------------------------ */
 
@@ -682,7 +847,15 @@ FailureInfo classifyResult(int exitCode, const std::string &rawOutput)
 		info.explanation = "openFPGALoader does not know the selected board.";
 		info.checks = {"select your board again from the list",
 			"or choose \"Auto Detect / Generic JTAG\""};
-	} else if (has("unable to open '") || has("fail to open ") ||
+	} else if (has("missing FX2 firmware") || has("usbBlasterII: missing firmware") ||
+			(has("firmware") && has("blaster"))) {
+		info.kind = FailureKind::BlasterFirmware;
+		info.title = "The USB-Blaster II needs its firmware file.";
+		info.explanation = "openFPGALoader must load Intel's blaster_6810.hex into the "
+			"USB-Blaster II, and the file was not found or could not be loaded.";
+		info.checks = {"ask your lab instructor to open \"USB Setup...\" and locate blaster_6810.hex "
+			"(it is part of the Quartus installation)"};
+	} else if (has("unable to open '") || (has("fail to open ") && !has("fail to open device")) ||
 			has("No such file") || has("Unable to open '")) {
 		info.kind = FailureKind::BadBitstream;
 		info.title = "Cannot open the bitstream file.";
@@ -715,7 +888,7 @@ FailureInfo classifyResult(int exitCode, const std::string &rawOutput)
 			"close other programs using the board (Vivado Hardware Manager, Quartus, Gowin)",
 			"unplug and re-plug the USB cable"};
 	} else if (has("unable to open ftdi device") || has("No cable found") ||
-			has("fails to open device") || has("can't get USB device") ||
+			has("fails to open device") || has("fail to open device") || has("can't get USB device") ||
 			has("No USB devices found") || has("device not found") ||
 			has("Failed to claim cable") || has("JTAG init failed") ||
 			(has("not found") && has("cable"))) {

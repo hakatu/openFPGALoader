@@ -39,6 +39,7 @@ void Settings::load(const std::string &iniPath)
 	cable = readKey(ini, L"cable");
 	flash = readKey(ini, L"mode") == "flash";
 	lastDir = readKey(ini, L"lastDir");
+	blasterFirmware = readKey(ini, L"blasterFirmware");
 }
 
 bool Settings::save(const std::string &iniPath) const
@@ -67,6 +68,8 @@ bool Settings::save(const std::string &iniPath) const
 	ok &= !!WritePrivateProfileStringW(kSection, L"cable", widen(cable).c_str(), ini.c_str());
 	ok &= !!WritePrivateProfileStringW(kSection, L"mode", flash ? L"flash" : L"sram", ini.c_str());
 	ok &= !!WritePrivateProfileStringW(kSection, L"lastDir", widen(lastDir).c_str(), ini.c_str());
+	ok &= !!WritePrivateProfileStringW(kSection, L"blasterFirmware",
+		widen(blasterFirmware).c_str(), ini.c_str());
 	return ok;
 }
 

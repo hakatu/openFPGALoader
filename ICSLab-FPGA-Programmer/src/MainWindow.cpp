@@ -25,7 +25,7 @@ const UINT WM_APP_DONE = WM_APP + 2;
 
 enum {
 	IDC_BOARD = 1001, IDC_CABLE, IDC_FILE, IDC_BROWSE, IDC_SRAM, IDC_FLASH,
-	IDC_DETECT, IDC_STATUS, IDC_PROGRESS, IDC_PROGRAM, IDC_DETAILS, IDC_ABOUT,
+	IDC_DETECT, IDC_STATUS, IDC_PROGRESS, IDC_PROGRAM, IDC_DETAILS, IDC_ABOUT, IDC_USBSETUP,
 	IDC_LOG,
 };
 
@@ -229,8 +229,9 @@ void MainWindow::createControls()
 
 	_sep2 = mk(L"STATIC", L"", SS_ETCHEDHORZ, 0);
 	_btnDetails = mk(WC_BUTTONW, L"&Show Details >>", BS_PUSHBUTTON | WS_TABSTOP, IDC_DETAILS);
+	_btnUsbSetup = mk(WC_BUTTONW, L"USB Setup...", BS_PUSHBUTTON | WS_TABSTOP, IDC_USBSETUP);
 	_btnAbout = mk(WC_BUTTONW, L"About", BS_PUSHBUTTON | WS_TABSTOP, IDC_ABOUT);
-	_footer = mk(L"STATIC", L"ICSLab  \x2022  powered by openFPGALoader", SS_CENTER, 0);
+	_footer = mk(L"STATIC", L"ICSLab \x2022 powered by openFPGALoader", SS_CENTER, 0);
 	SendMessageW(_footer, WM_SETFONT, reinterpret_cast<WPARAM>(_fontSmall), TRUE);
 
 	_edLog = mk(WC_EDITW, L"", ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | ES_AUTOHSCROLL |
@@ -290,9 +291,10 @@ void MainWindow::layout()
 
 	place(_sep2, x0, y, W - 2 * x0, 2);
 	y += 8;
-	place(_btnDetails, x0, y, 130, 26);
-	place(_footer, x0 + 140, y + 5, W - 2 * x0 - 280, 18);
-	place(_btnAbout, W - kMargin - 80, y, 80, 26);
+	place(_btnDetails, x0, y, 122, 26);
+	place(_footer, x0 + 124, y + 5, W - 2 * x0 - 124 - 164, 18);
+	place(_btnUsbSetup, W - kMargin - 64 - 6 - 94, y, 94, 26);
+	place(_btnAbout, W - kMargin - 64, y, 64, 26);
 	y += 36;
 	_baseHeight = y; // log panel starts here
 	place(_edLog, x0, y, W - 2 * x0, kLogHeight - 12);
@@ -330,12 +332,9 @@ void MainWindow::populateBoards()
 	SendMessageW(_cbBoard, CB_RESETCONTENT, 0, 0);
 	_boardEntries.clear();
 
-	auto add = [&](const std::string &label, const std::string &name, bool sep = false) {
-		BoardEntry e;
-		e.name = name;
-		e.separator = sep;
+	auto add = [&](const std::string &text, BoardEntry e) {
 		_boardEntries.push_back(e);
-		SendMessageW(_cbBoard, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(widen(label).c_str()));
+		SendMessageW(_cbBoard, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(widen(text).c_str()));
 	};
 	auto partOf = [&](const std::string &name) -> std::string {
 		for (const auto &b : _boards)
@@ -344,36 +343,53 @@ void MainWindow::populateBoards()
 		return std::string();
 	};
 
-	add(kGenericLabel, "");
+	BoardEntry generic;
+	generic.label = kGenericLabel;
+	add(kGenericLabel, generic);
+
 	std::set<std::string> known;
 	for (const auto &b : _boards)
 		known.insert(b.name);
 	for (const auto &lb : _labBoards) {
-		// Skip lab entries the backend does not know (when the list loaded)
-		if (!_boards.empty() && !known.count(lb.name))
-			continue;
-		std::string label = lb.label;
-		if (label != lb.name)
-			label += "   [" + lb.name + "]";
+		BoardEntry e;
+		e.key = lb.name;
+		e.label = lb.label;
+		e.cable = lb.cable;
+		if (known.count(lb.name) || (_boards.empty() && lb.cable.empty())) {
+			e.boardArg = lb.name; // openFPGALoader board ("-b")
+		} else if (lb.cable.empty()) {
+			continue; // unknown to the backend and no cable given
+		} // else: cable-only board (no openFPGALoader board entry), "-c <cable>"
+		std::string text = lb.label;
+		if (!e.boardArg.empty() && lb.label != lb.name)
+			text += "   [" + lb.name + "]";
 		std::string part = partOf(lb.name);
 		if (!part.empty())
-			label += "   " + part;
-		add(label, lb.name);
+			text += "   " + part;
+		else if (e.boardArg.empty())
+			text += "   (" + lb.cable + ")";
+		add(text, e);
 	}
 	if (!_boards.empty()) {
-		add(kSeparator, "", true);
+		BoardEntry sep;
+		sep.separator = true;
+		add(kSeparator, sep);
 		for (const auto &b : _boards) {
-			std::string label = b.name;
+			BoardEntry e;
+			e.key = e.boardArg = b.name;
+			e.label = friendlyBoardName(b.name);
+			std::string text = b.name;
 			if (!b.fpgaPart.empty())
-				label += "   (" + b.fpgaPart + ")";
-			add(label, b.name);
+				text += "   (" + b.fpgaPart + ")";
+			add(text, e);
 		}
 	}
 
 	// Restore saved board (first occurrence)
 	int sel = 0;
 	for (size_t i = 0; i < _boardEntries.size(); ++i) {
-		if (!_boardEntries[i].separator && _boardEntries[i].name == _settings.board) {
+		if (!_boardEntries[i].separator && !_boardEntries[i].key.empty() &&
+				_boardEntries[i].key == _settings.board) {
 			sel = static_cast<int>(i);
 			break;
 		}
@@ -395,12 +411,67 @@ void MainWindow::populateCables()
 	SendMessageW(_cbCable, CB_SETCURSEL, sel, 0);
 }
 
-std::string MainWindow::selectedBoard() const
+const MainWindow::BoardEntry &MainWindow::selectedEntry() const
 {
+	static const BoardEntry none;
 	LRESULT i = SendMessageW(_cbBoard, CB_GETCURSEL, 0, 0);
 	if (i < 0 || static_cast<size_t>(i) >= _boardEntries.size())
+		return none;
+	return _boardEntries[static_cast<size_t>(i)];
+}
+
+std::string MainWindow::selectedBoard() const
+{
+	return selectedEntry().boardArg;
+}
+
+std::string MainWindow::requestCable() const
+{
+	// Explicit choice in the Cable list wins over the lab board's cable.
+	std::string c = selectedCable();
+	return c.empty() ? selectedEntry().cable : c;
+}
+
+std::string MainWindow::effectiveCable() const
+{
+	std::string c = requestCable();
+	if (!c.empty())
+		return c;
+	const std::string board = selectedBoard();
+	for (const auto &b : _boards)
+		if (b.name == board)
+			return b.cable;
+	return std::string();
+}
+
+std::string MainWindow::blasterFirmware() const
+{
+	return findBlasterFirmware(_exeDir, _settings.blasterFirmware);
+}
+
+std::string MainWindow::driverHint(const FailureInfo &info) const
+{
+	// A connected USB-Blaster whose Windows driver openFPGALoader cannot use
+	// is the most likely cause of "programmer not found" style failures.
+	if (info.kind != FailureKind::CableNotFound && info.kind != FailureKind::UsbDriver &&
+			info.kind != FailureKind::Unknown)
 		return std::string();
-	return _boardEntries[static_cast<size_t>(i)].name;
+	std::string hint = blasterDriverHint(listIntelBlasters());
+	return hint.empty() ? std::string() : "\r\n\r\n" + hint;
+}
+
+std::string MainWindow::autoCable(const std::string &board, const std::string &cable) const
+{
+	// "Auto Detect / Generic JTAG" with an Intel blaster connected: use it
+	// instead of openFPGALoader's default (ft2232).
+	if (!board.empty() || !cable.empty())
+		return cable;
+	for (const auto &d : listIntelBlasters()) {
+		std::string c = blasterCableName(d.vid, d.pid);
+		if (!c.empty())
+			return c;
+	}
+	return cable;
 }
 
 std::string MainWindow::selectedCable() const
@@ -447,11 +518,12 @@ void MainWindow::setStatus(const std::string &text, Tone tone)
 
 std::string MainWindow::targetSummary() const
 {
-	std::string board = selectedBoard();
+	const BoardEntry &entry = selectedEntry();
 	std::string file = bitstreamPath();
-	std::string s = "Board:   " + (board.empty() ? std::string(kGenericLabel)
-		: friendlyBoardName(board) + (friendlyBoardName(board) != board ? " [" + board + "]" : ""));
-	std::string cable = selectedCable();
+	std::string s = "Board:   " + (entry.key.empty() ? std::string(kGenericLabel)
+		: entry.label + (entry.label != entry.key && !entry.boardArg.empty() ?
+			" [" + entry.key + "]" : ""));
+	std::string cable = requestCable();
 	if (!cable.empty())
 		s += "\r\nCable:   " + cable;
 	s += "\r\nFile:    " + (file.empty() ? std::string("(no bitstream selected)") : fileBaseName(file));
@@ -514,7 +586,7 @@ void MainWindow::setBusy(bool busy)
 
 void MainWindow::saveSettings()
 {
-	_settings.board = selectedBoard();
+	_settings.board = selectedEntry().key;
 	_settings.cable = selectedCable();
 	_settings.flash = flashSelected();
 	_settings.save(_settingsPath);
@@ -525,7 +597,7 @@ void MainWindow::saveSettings()
 /* ------------------------------------------------------------------------ */
 
 void MainWindow::startWorker(Task task, std::vector<std::vector<std::string>> runs,
-	std::string detectBoard, std::string detectCable)
+	std::string detectBoard, std::string detectCable, std::string firmware)
 {
 	if (_busy || _backend.empty())
 		return;
@@ -534,7 +606,7 @@ void MainWindow::startWorker(Task task, std::vector<std::vector<std::string>> ru
 		_worker = nullptr;
 	}
 	auto *job = new WorkerJob{_hwnd, task, _backend, std::move(runs),
-		std::move(detectBoard), std::move(detectCable)};
+		std::move(detectBoard), std::move(detectCable), std::move(firmware)};
 	_task = task;
 	setBusy(true);
 	_worker = CreateThread(nullptr, 0, workerMain, job, 0, nullptr);
@@ -587,7 +659,7 @@ DWORD WINAPI MainWindow::workerMain(LPVOID param)
 			}
 		}
 		if (scan.launched && done->summary != "nocable")
-			run(buildDetectArgs(job->detectBoard, cable), true);
+			run(buildDetectArgs(job->detectBoard, cable, job->firmware), true);
 	} else {
 		for (const auto &args : job->runs) {
 			ProcessResult r = run(args, job->task == Task::Program);
@@ -666,8 +738,11 @@ void MainWindow::onWorkerDone(WorkerDone *d)
 		const auto &scan = done->runs[0];
 		auto probes = parseScanUsb(scan.output);
 		std::string s;
+		const auto blasters = listIntelBlasters();
+		for (const auto &b : blasters)
+			s += "Windows driver: " + b.summary() + "\r\n";
 		if (probes.empty()) {
-			s += "USB programmer: none found\r\n";
+			s += "USB programmer: none found by openFPGALoader\r\n";
 		} else {
 			for (const auto &p : probes) {
 				s += "USB programmer: " + (p.product.empty() || p.product == "none" ?
@@ -678,19 +753,16 @@ void MainWindow::onWorkerDone(WorkerDone *d)
 			FailureInfo info = classifyResult(1, scan.output);
 			if (info.kind == FailureKind::Unknown)
 				info = classifyResult(1, "No USB devices found");
-			setStatus(s + "\r\n" + formatFailure(info), Tone::Bad);
+			setStatus(s + "\r\n" + formatFailure(info) + driverHint(info), Tone::Bad);
 			return;
 		}
 		const auto &det = done->runs[1];
 		std::string board = selectedBoard();
-		std::string cable = selectedCable();
+		std::string cable = autoCable(board, requestCable());
 		if (cable.empty() && done->summary.compare(0, 6, "cable:") == 0)
 			cable = done->summary.substr(6);
-		if (cable.empty() && !board.empty()) {
-			for (const auto &b : _boards)
-				if (b.name == board)
-					cable = b.cable;
-		}
+		if (cable.empty())
+			cable = effectiveCable();
 		s += "JTAG cable:     " + (cable.empty() ? std::string("ft2232 (default)") : cable) + "\r\n";
 
 		auto devices = parseDetect(det.output);
@@ -698,7 +770,7 @@ void MainWindow::onWorkerDone(WorkerDone *d)
 			FailureInfo info = classifyResult(det.exitCode ? det.exitCode : 1, det.output);
 			if (devices.empty() && det.exitCode == 0)
 				info = classifyResult(1, "Error: no device found");
-			setStatus(s + "\r\n" + formatFailure(info), Tone::Bad);
+			setStatus(s + "\r\n" + formatFailure(info) + driverHint(info), Tone::Bad);
 			return;
 		}
 		for (const auto &dv : devices) {
@@ -710,7 +782,7 @@ void MainWindow::onWorkerDone(WorkerDone *d)
 			s += "IDCODE:         " + hex32(dv.idcode) + "\r\n";
 		}
 		if (!board.empty()) {
-			s += "Board:          " + friendlyBoardName(board) + " (selected)";
+			s += "Board:          " + selectedEntry().label + " (selected)";
 		} else {
 			std::vector<std::string> matches;
 			for (const auto &dv : devices) {
@@ -751,8 +823,8 @@ void MainWindow::onWorkerDone(WorkerDone *d)
 			setProgress(0);
 			FailureInfo info = classifyResult(r.exitCode, r.output);
 			appendLog("== FAILED (exit code " + std::to_string(r.exitCode) + ") ==");
-			setStatus(formatFailure(info) + "\r\n\r\nFull log: click \"Show Details\".",
-				Tone::Bad);
+			setStatus(formatFailure(info) + driverHint(info) +
+				"\r\n\r\nFull log: click \"Show Details\".", Tone::Bad);
 		}
 	}
 }
@@ -804,7 +876,12 @@ void MainWindow::onDetect()
 	appendLog("== Detect board ==");
 	setStatus("Detecting USB programmer and FPGA...", Tone::Busy);
 	setProgressMarquee(true);
-	startWorker(Task::Detect, {}, selectedBoard(), selectedCable());
+	std::string board = selectedBoard();
+	std::string cable = autoCable(board, requestCable());
+	std::string fw;
+	if (cableNeedsBlasterFirmware(cable.empty() ? effectiveCable() : cable))
+		fw = backendSafePath(blasterFirmware());
+	startWorker(Task::Detect, {}, board, cable, fw);
 }
 
 void MainWindow::onProgram()
@@ -845,8 +922,17 @@ void MainWindow::onProgram()
 
 	ProgramRequest req;
 	req.board = selectedBoard();
-	req.cable = selectedCable();
+	req.cable = autoCable(req.board, requestCable());
 	req.bitstream = safePath;
+	const std::string cableUsed = req.cable.empty() ? effectiveCable() : req.cable;
+	if (cableNeedsBlasterFirmware(cableUsed)) {
+		req.probeFirmware = backendSafePath(blasterFirmware());
+		if (req.probeFirmware.empty()) {
+			setStatus(formatFailure(classifyResult(1, "missing FX2 firmware")), Tone::Bad);
+			appendLog("ERROR: blaster_6810.hex not found (USB-Blaster II firmware).");
+			return;
+		}
+	}
 	req.target = flashSelected() ? ProgramTarget::Flash : ProgramTarget::Sram;
 
 	if (req.target == ProgramTarget::Flash) {
@@ -895,6 +981,144 @@ void MainWindow::onAbout()
 		"Backend version: " + (_backendVersion.empty() ? std::string("unknown") : _backendVersion) + "\n\n"
 		"License notices: see the LICENSES folder and README-licenses.txt.";
 	MessageBoxW(_hwnd, widen(text).c_str(), L"About ICSLab FPGA Programmer", MB_ICONINFORMATION);
+}
+
+/* ------------------------------------------------------------------------ */
+/* USB Setup dialog (lab instructor)                                        */
+/* ------------------------------------------------------------------------ */
+
+namespace {
+
+const UINT WM_APP_DRIVER_DONE = WM_APP + 20;
+
+struct DriverJob {
+	HWND dlg;
+	std::string action, backend, firmware;
+};
+
+DWORD WINAPI driverJobMain(LPVOID param)
+{
+	std::unique_ptr<DriverJob> job(static_cast<DriverJob *>(param));
+	auto *res = new DriverResult(runDriverSetupElevated(job->action, job->backend, job->firmware));
+	if (!PostMessageW(job->dlg, WM_APP_DRIVER_DONE, 0, reinterpret_cast<LPARAM>(res)))
+		delete res;
+	return 0;
+}
+
+} // namespace
+
+void MainWindow::refreshUsbSetup(HWND dlg)
+{
+	std::string s;
+	auto devs = listIntelBlasters();
+	for (const auto &d : devs)
+		s += d.summary() + "\r\n";
+	if (devs.empty())
+		s = "No USB-Blaster found. Connect the board with its USB-Blaster port, "
+			"switch it on, then click Refresh.";
+	SetDlgItemTextW(dlg, IDC_US_DEVICES, widen(s).c_str());
+	std::string fw = blasterFirmware();
+	SetDlgItemTextW(dlg, IDC_US_FIRMWARE, widen(fw.empty() ?
+		std::string("(not found - click Locate... ; only needed for USB-Blaster II)") : fw).c_str());
+}
+
+INT_PTR CALLBACK MainWindow::usbSetupProc(HWND dlg, UINT msg, WPARAM wp, LPARAM lp)
+{
+	auto *self = reinterpret_cast<MainWindow *>(GetWindowLongPtrW(dlg, DWLP_USER));
+	switch (msg) {
+	case WM_INITDIALOG:
+		SetWindowLongPtrW(dlg, DWLP_USER, lp);
+		self = reinterpret_cast<MainWindow *>(lp);
+		self->_driverBusy = false;
+		// UAC shield on the buttons that need administrator rights
+		SendDlgItemMessageW(dlg, IDC_US_INSTALL, BCM_SETSHIELD, 0, TRUE);
+		SendDlgItemMessageW(dlg, IDC_US_RESTORE, BCM_SETSHIELD, 0, TRUE);
+		self->refreshUsbSetup(dlg);
+		SetFocus(GetDlgItem(dlg, IDC_US_REFRESH));
+		return FALSE; // focus set explicitly
+
+	case WM_COMMAND:
+		switch (LOWORD(wp)) {
+		case IDC_US_REFRESH:
+			if (!self->_driverBusy)
+				self->refreshUsbSetup(dlg);
+			return TRUE;
+		case IDC_US_INSTALL:
+		case IDC_US_RESTORE: {
+			if (self->_driverBusy)
+				return TRUE;
+			const bool install = LOWORD(wp) == IDC_US_INSTALL;
+			if (!install && MessageBoxW(dlg, L"Restore Intel's driver for the connected "
+					L"USB-Blasters?\n\nopenFPGALoader (and this application) will no longer "
+					L"be able to use them.", L"Restore original driver",
+					MB_ICONQUESTION | MB_YESNO | MB_DEFBUTTON2) != IDYES)
+				return TRUE;
+			self->_driverBusy = true;
+			for (int id : {IDC_US_REFRESH, IDC_US_INSTALL, IDC_US_RESTORE, IDC_US_LOCATE, IDCANCEL})
+				EnableWindow(GetDlgItem(dlg, id), FALSE);
+			SetDlgItemTextW(dlg, IDC_US_RESULT, L"Waiting for administrator approval, then "
+				L"configuring the driver (this can take up to a minute)...");
+			auto *job = new DriverJob{dlg, install ? "install" : "restore", self->_backend,
+				backendSafePath(self->blasterFirmware())};
+			HANDLE t = CreateThread(nullptr, 0, driverJobMain, job, 0, nullptr);
+			if (t) {
+				CloseHandle(t);
+			} else {
+				delete job;
+				auto *res = new DriverResult;
+				res->message = "Could not start: " + describeWin32Error(GetLastError());
+				PostMessageW(dlg, WM_APP_DRIVER_DONE, 0, reinterpret_cast<LPARAM>(res));
+			}
+			return TRUE;
+		}
+		case IDC_US_LOCATE: {
+			if (self->_driverBusy)
+				return TRUE;
+			wchar_t file[MAX_PATH * 4] = L"";
+			OPENFILENAMEW ofn = {};
+			ofn.lStructSize = sizeof(ofn);
+			ofn.hwndOwner = dlg;
+			ofn.lpstrFilter = L"USB-Blaster II firmware (blaster_6810.hex)\0blaster_6810.hex\0"
+				L"Intel HEX files (*.hex)\0*.hex\0";
+			ofn.lpstrFile = file;
+			ofn.nMaxFile = sizeof(file) / sizeof(file[0]);
+			ofn.lpstrTitle = L"Locate blaster_6810.hex (in the Quartus installation)";
+			ofn.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_HIDEREADONLY | OFN_EXPLORER;
+			if (GetOpenFileNameW(&ofn)) {
+				self->_settings.blasterFirmware = narrow(file);
+				self->_settings.save(self->_settingsPath);
+				self->refreshUsbSetup(dlg);
+			}
+			return TRUE;
+		}
+		case IDCANCEL:
+			if (!self->_driverBusy)
+				EndDialog(dlg, 0);
+			return TRUE;
+		}
+		break;
+
+	case WM_APP_DRIVER_DONE: {
+		std::unique_ptr<DriverResult> res(reinterpret_cast<DriverResult *>(lp));
+		self->_driverBusy = false;
+		for (int id : {IDC_US_REFRESH, IDC_US_INSTALL, IDC_US_RESTORE, IDC_US_LOCATE, IDCANCEL})
+			EnableWindow(GetDlgItem(dlg, id), TRUE);
+		std::string head = res->cancelled ? "Cancelled." : res->ok ? "Done." : "Not completed.";
+		SetDlgItemTextW(dlg, IDC_US_RESULT, widen(head + "\r\n" + res->message).c_str());
+		self->appendLog("== USB Setup ==\r\n" + res->message);
+		self->refreshUsbSetup(dlg);
+		return TRUE;
+	}
+	}
+	return FALSE;
+}
+
+void MainWindow::onUsbSetup()
+{
+	if (_busy)
+		return;
+	DialogBoxParamW(_hInst, MAKEINTRESOURCEW(IDD_USBSETUP), _hwnd, usbSetupProc,
+		reinterpret_cast<LPARAM>(this));
 }
 
 /* ------------------------------------------------------------------------ */
@@ -958,6 +1182,7 @@ LRESULT MainWindow::handle(UINT msg, WPARAM wp, LPARAM lp)
 		case IDC_PROGRAM: onProgram(); break;
 		case IDC_DETAILS: onToggleDetails(); break;
 		case IDC_ABOUT: onAbout(); break;
+		case IDC_USBSETUP: onUsbSetup(); break;
 		// IDOK (Enter key) is deliberately ignored: programming only
 		// starts from an explicit click on PROGRAM FPGA.
 		}

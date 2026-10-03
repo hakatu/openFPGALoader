@@ -9,6 +9,9 @@
 #include <shellapi.h>
 
 #include "MainWindow.h"
+#include "DriverSetup.h"
+
+#include <cwchar>
 
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow)
 {
@@ -22,6 +25,12 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow)
 	int argc = 0;
 	wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 	if (argv) {
+		// Elevated USB driver setup helper started by "USB Setup..."
+		if (argc > 1 && !wcscmp(argv[1], L"--driver-setup")) {
+			int rc = icslab::driverSetupHelperMain(argc, argv);
+			LocalFree(argv);
+			return rc;
+		}
 		if (argc > 1)
 			initialBitstream = icslab::narrow(argv[1]);
 		LocalFree(argv);

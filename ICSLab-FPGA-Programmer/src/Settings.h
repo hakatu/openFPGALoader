@@ -17,6 +17,7 @@ struct Settings {
 	std::string cable;      // "" = automatic
 	bool flash = false;     // programming mode
 	std::string lastDir;    // last bitstream directory
+	std::string blasterFirmware; // blaster_6810.hex chosen by the instructor
 
 	static std::string defaultPath();
 	void load(const std::string &iniPath);

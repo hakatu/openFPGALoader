@@ -3,6 +3,16 @@
 
 #define IDI_APPICON 101
 
+#define IDD_USBSETUP        200
+#define IDC_US_DEVICES      201
+#define IDC_US_REFRESH      202
+#define IDC_US_INSTALL      203
+#define IDC_US_RESTORE      204
+#define IDC_US_FIRMWARE     205
+#define IDC_US_LOCATE       206
+#define IDC_US_RESULT       207
+#define IDC_US_INFO         208
+
 #ifndef ICSLAB_VERSION_MAJOR
 #define ICSLAB_VERSION_MAJOR 1
 #define ICSLAB_VERSION_MINOR 0

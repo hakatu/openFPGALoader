@@ -15,6 +15,7 @@
 #include "OpenFPGALoaderBackend.h"
 #include "ProcessRunner.h"
 #include "Settings.h"
+#include "DriverSetup.h"
 
 namespace icslab {
 
@@ -29,7 +30,10 @@ private:
 	enum class Task { None, LoadLists, Detect, Program };
 
 	struct BoardEntry {
-		std::string name;   // "" = generic
+		std::string key;      // saved in settings; "" = generic
+		std::string boardArg; // openFPGALoader board for "-b" ("" = none)
+		std::string cable;    // cable from lab-boards.txt ("" = board default)
+		std::string label;    // friendly name
 		bool separator = false;
 	};
 
@@ -52,7 +56,13 @@ private:
 
 	void populateBoards();
 	void populateCables();
+	const BoardEntry &selectedEntry() const;
 	std::string selectedBoard() const;
+	std::string requestCable() const;   // value for "-c" ("" = none)
+	std::string effectiveCable() const; // cable openFPGALoader will use
+	std::string blasterFirmware() const;
+	std::string autoCable(const std::string &board, const std::string &cable) const;
+	std::string driverHint(const FailureInfo &info) const;
 	std::string selectedCable() const;
 	std::string bitstreamPath() const;
 	bool flashSelected() const;
@@ -64,11 +74,15 @@ private:
 	void onProgram();
 	void onToggleDetails();
 	void onAbout();
+	void onUsbSetup();
+	void refreshUsbSetup(HWND dlg);
+	static INT_PTR CALLBACK usbSetupProc(HWND, UINT, WPARAM, LPARAM);
 	void onWorkerLine(WorkerLine *line);
 	void onWorkerDone(WorkerDone *done);
 
 	void startWorker(Task task, std::vector<std::vector<std::string>> runs,
-		std::string detectBoard = std::string(), std::string detectCable = std::string());
+		std::string detectBoard = std::string(), std::string detectCable = std::string(),
+		std::string firmware = std::string());
 	static DWORD WINAPI workerMain(LPVOID param);
 
 	void setBusy(bool busy);
@@ -95,6 +109,8 @@ private:
 	HWND _sep1 = nullptr, _lblStatus = nullptr, _edStatus = nullptr, _progress = nullptr;
 	HWND _btnProgram = nullptr;
 	HWND _sep2 = nullptr, _btnDetails = nullptr, _btnAbout = nullptr, _footer = nullptr;
+	HWND _btnUsbSetup = nullptr;
+	bool _driverBusy = false;
 	HWND _edLog = nullptr;
 
 	HFONT _fontUi = nullptr, _fontTitle = nullptr, _fontBig = nullptr;
@@ -128,6 +144,7 @@ private:
 		std::string exe;
 		std::vector<std::vector<std::string>> runs;
 		std::string detectBoard, detectCable;
+		std::string firmware; // USB-Blaster II firmware ("" if not needed)
 	};
 };
 

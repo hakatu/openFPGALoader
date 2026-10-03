@@ -41,8 +41,8 @@ if(WIN32)
 		set(ICSLAB_STATIC_FLAGS -static -static-libgcc -static-libstdc++)
 	endif()
 
-	add_library(icslab_win STATIC src/ProcessRunner.cpp src/Settings.cpp)
-	target_link_libraries(icslab_win PUBLIC icslab_core)
+	add_library(icslab_win STATIC src/ProcessRunner.cpp src/Settings.cpp src/DriverSetup.cpp)
+	target_link_libraries(icslab_win PUBLIC icslab_core setupapi cfgmgr32 shell32)
 
 	add_executable(icslab_fpga_programmer WIN32
 		src/main.cpp

@@ -19,6 +19,7 @@
 #endif
 #include <windows.h>
 #include "ProcessRunner.h"
+#include "DriverSetup.h"
 #endif
 
 using namespace icslab;
@@ -400,6 +401,116 @@ TEST(error_return_code_handling)
 	CHECK(classifyResult(42, "x").explanation.find("42") != std::string::npos);
 }
 
+TEST(usb_hardware_ids)
+{
+	uint16_t vid = 0, pid = 0;
+	int mi = 0;
+	CHECK(parseUsbHardwareId("USB\\VID_09FB&PID_6010&REV_0100", vid, pid, mi));
+	CHECK_EQ(unsigned(vid), 0x09FBu);
+	CHECK_EQ(unsigned(pid), 0x6010u);
+	CHECK_EQ(mi, -1);
+	CHECK(parseUsbHardwareId("usb\\vid_0403&pid_6010&mi_01", vid, pid, mi));
+	CHECK_EQ(unsigned(pid), 0x6010u);
+	CHECK_EQ(mi, 1);
+	CHECK(!parseUsbHardwareId("HID\\VID_09FB&PID_6001", vid, pid, mi));
+	CHECK(!parseUsbHardwareId("USB\\ROOT_HUB30", vid, pid, mi));
+	CHECK(isIntelBlaster(0x09FB, 0x6001));
+	CHECK(isIntelBlaster(0x09FB, 0x6010));
+	CHECK(isIntelBlaster(0x09FB, 0x6810));
+	CHECK(!isIntelBlaster(0x0403, 0x6010));
+	CHECK_EQ(blasterCableName(0x09FB, 0x6001), "usb-blaster");
+	CHECK_EQ(blasterCableName(0x09FB, 0x6010), "usb-blasterII");
+	CHECK_EQ(blasterCableName(0x09FB, 0x6810), "usb-blasterII");
+	CHECK_EQ(blasterCableName(0x0403, 0x6010), "");
+	CHECK(cableNeedsBlasterFirmware("usb-blasterII"));
+	CHECK(!cableNeedsBlasterFirmware("usb-blaster"));
+}
+
+TEST(device_problem_codes)
+{
+	CHECK(describeDeviceProblem(52).find("digital signature") != std::string::npos);
+	CHECK(describeDeviceProblem(39).find("Memory Integrity") != std::string::npos);
+	CHECK(describeDeviceProblem(28).find("no driver") != std::string::npos);
+	CHECK(describeDeviceProblem(999).find("999") != std::string::npos);
+	CHECK(isWinUsbService("WinUSB"));
+	CHECK(isWinUsbService("winusb"));
+	CHECK(!isWinUsbService("usbblstr"));
+}
+
+TEST(blaster_firmware_candidates)
+{
+	auto roots = quartusInstallRoots("C:");
+	CHECK(!roots.empty());
+	CHECK_EQ(roots[0], "C:\\intelFPGA_lite");
+	auto c = blasterFirmwareCandidates("D:\\Lab App", "E:\\fw\\blaster_6810.hex",
+		"C:\\intelFPGA\\23.1\\quartus", {"C:\\intelFPGA_lite\\20.1"});
+	CHECK(c.size() >= 5);
+	if (c.size() >= 3) {
+		CHECK_EQ(c[0], "E:\\fw\\blaster_6810.hex");
+		CHECK_EQ(c[1], "D:\\Lab App\\firmware\\blaster_6810.hex");
+		CHECK_EQ(c[2], "C:\\intelFPGA\\23.1\\quartus\\bin64\\blaster_6810.hex");
+	}
+	bool lite = false, prog = false;
+	for (const auto &x : c) {
+		lite |= x == "C:\\intelFPGA_lite\\20.1\\quartus\\bin64\\blaster_6810.hex";
+		prog |= x == "C:\\intelFPGA_lite\\20.1\\qprogrammer\\bin64\\blaster_6810.hex";
+	}
+	CHECK(lite);
+	CHECK(prog);
+	// no configured path: starts with the app firmware folder
+	c = blasterFirmwareCandidates("D:\\App", "", "", {});
+	CHECK_EQ(c.front(), "D:\\App\\firmware\\blaster_6810.hex");
+}
+
+TEST(lab_boards_with_cable)
+{
+	auto l = parseLabBoards("de2_standard = Terasic DE2-Standard | cable=usb-blasterII\n"
+		"basys3 | cable = digilent\n");
+	CHECK_EQ(l.size(), size_t(2));
+	if (l.size() == 2) {
+		CHECK_EQ(l[0].name, "de2_standard");
+		CHECK_EQ(l[0].label, "Terasic DE2-Standard");
+		CHECK_EQ(l[0].cable, "usb-blasterII");
+		CHECK_EQ(l[1].name, "basys3");
+		CHECK_EQ(l[1].label, "Digilent Basys 3");
+		CHECK_EQ(l[1].cable, "digilent");
+	}
+	bool de2 = false;
+	for (const auto &b : defaultLabBoards())
+		de2 |= b.name == "de2_standard" && b.cable == "usb-blasterII";
+	CHECK(de2);
+}
+
+TEST(blaster_ii_commands)
+{
+	const std::string fw = "C:\\intelFPGA lite\\20.1\\quartus\\bin64\\blaster_6810.hex";
+	ProgramRequest r;
+	r.cable = "usb-blasterII";
+	r.bitstream = "C:\\lab\\top.rbf";
+	r.probeFirmware = fw;
+	CHECK_EQ(buildProgramArgs(r), (std::vector<std::string>{"-c", "usb-blasterII",
+		"--probe-firmware", fw, "--write-sram", "--bitstream", "C:\\lab\\top.rbf"}));
+	CHECK_EQ(buildDetectArgs("", "usb-blasterII", fw), (std::vector<std::string>{"-c",
+		"usb-blasterII", "--probe-firmware", fw, "--detect"}));
+	auto argv = splitWindowsCommandLine(buildCommandLine("x.exe", buildProgramArgs(r)));
+	CHECK_EQ(argv.size(), size_t(8));
+	if (argv.size() == 8)
+		CHECK_EQ(argv[4], fw);
+}
+
+TEST(blaster_error_mapping)
+{
+	CHECK_EQ(classifyResult(1, "missing FX2 firmware\nuse --probe-firmware with something\n"
+		"JTAG init failed with: usbBlasterII: missing firmware").kind, FailureKind::BlasterFirmware);
+	// firmware given but no blaster connected (real backend output)
+	CHECK_EQ(classifyResult(1, "Waiting reload: [====] 100.00%\n\nFail\n"
+		"JTAG init failed with: FX2: fail to open device").kind, FailureKind::CableNotFound);
+	CHECK_EQ(classifyResult(1, "unable to open ftdi device: -3 (device not found)\n"
+		"JTAG init failed with: std::exception").kind, FailureKind::CableNotFound);
+	// bitstream open errors still detected
+	CHECK_EQ(classifyResult(1, "Error: fail to open C:\\x.bit").kind, FailureKind::BadBitstream);
+}
+
 TEST(strip_ansi)
 {
 	CHECK_EQ(stripAnsi("\x1b[31mError\x1b[0m done"), "Error done");
@@ -533,6 +644,46 @@ TEST(win_backend_safe_path)
 	CHECK_EQ(backendSafePath(ascii), ascii);
 }
 
+TEST(win_driver_setup_without_devices)
+{
+	// No USB-Blaster under Wine/CI: must return an empty list, not fail.
+	auto devs = listIntelBlasters();
+	CHECK(devs.empty());
+	CHECK_EQ(blasterDriverHint(devs), "");
+	UsbDeviceStatus st;
+	st.vid = 0x09FB;
+	st.pid = 0x6010;
+	st.hasProblem = true;
+	st.problem = 52;
+	CHECK(st.summary().find("code 52") != std::string::npos);
+	CHECK(!st.usableByOpenFPGALoader());
+	CHECK(blasterDriverHint({st}).find("USB Setup") != std::string::npos);
+	st.hasProblem = false;
+	st.problem = 0;
+	st.service = "WinUSB";
+	CHECK(st.usableByOpenFPGALoader());
+	CHECK_EQ(blasterDriverHint({st}), "");
+	// helper refuses malformed command lines
+	wchar_t a0[] = L"x.exe", a1[] = L"--driver-setup";
+	wchar_t *argv[] = {a0, a1};
+	CHECK_EQ(driverSetupHelperMain(2, argv), 2);
+}
+
+TEST(win_blaster_firmware_lookup)
+{
+	const std::string app = g_tmp + "\\Lab App";
+	CreateDirectoryW(widen(app).c_str(), nullptr);
+	CreateDirectoryW(widen(app + "\\firmware").c_str(), nullptr);
+	DeleteFileW(widen(app + "\\firmware\\blaster_6810.hex").c_str());
+	const std::string configured = g_tmp + "\\my fw.hex";
+	DeleteFileW(widen(configured).c_str());
+	CHECK_EQ(findBlasterFirmware(app, configured), ""); // nothing anywhere
+	writeFile(app + "\\firmware\\blaster_6810.hex", ":00000001FF\n");
+	CHECK_EQ(findBlasterFirmware(app, configured), app + "\\firmware\\blaster_6810.hex");
+	writeFile(configured, ":00000001FF\n");
+	CHECK_EQ(findBlasterFirmware(app, configured), configured); // instructor's choice first
+}
+
 TEST(win_real_backend_integration)
 {
 	if (g_real.empty()) {
@@ -551,6 +702,8 @@ TEST(win_real_backend_integration)
 	for (const auto &x : b)
 		names.insert(x.name);
 	for (const auto &lb : defaultLabBoards()) {
+		if (!lb.cable.empty())
+			continue; // cable-only lab board (no openFPGALoader board entry)
 		if (!names.count(lb.name))
 			std::printf("  lab board unknown to backend: %s\n", lb.name.c_str());
 		CHECK(names.count(lb.name) == 1);
@@ -586,6 +739,20 @@ TEST(win_real_backend_integration)
 	r = runProcess(g_real, buildDetectArgs("basys3", ""), nullptr);
 	CHECK(r.exitCode != 0);
 	CHECK(parseDetect(r.output).empty());
+
+	// USB-Blaster II without firmware / without device
+	r = runProcess(g_real, buildDetectArgs("", "usb-blasterII"), nullptr);
+	CHECK(r.exitCode != 0);
+	CHECK_EQ(classifyResult(r.exitCode, r.output).kind, FailureKind::BlasterFirmware);
+	writeFile(g_tmp + "\\fw test.hex", ":00000001FF\n");
+	r = runProcess(g_real, buildDetectArgs("", "usb-blasterII", g_tmp + "\\fw test.hex"), nullptr);
+	CHECK(r.exitCode != 0);
+	CHECK_EQ(classifyResult(r.exitCode, r.output).kind, FailureKind::CableNotFound);
+
+	// USB-Blaster (DE2-115) without device
+	r = runProcess(g_real, buildDetectArgs("", "usb-blaster"), nullptr);
+	CHECK(r.exitCode != 0);
+	CHECK_EQ(classifyResult(r.exitCode, r.output).kind, FailureKind::CableNotFound);
 }
 #endif
 

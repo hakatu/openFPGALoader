@@ -33,6 +33,10 @@ Board not detected / "Unable to communicate with the FPGA programmer"
   - Click "Detect Board" to see what the computer finds.
   - Try another USB port. Avoid unpowered USB hubs.
 
+Intel USB-Blaster (DE2, DE10 ...) with a yellow mark in Device Manager
+  - Lab instructor: click "USB Setup..." > "Install WinUSB driver"
+    (see docs\windows-driver.md). Quartus's own driver is not needed.
+
 USB driver issue / "Windows blocks access to the programmer"
   - openFPGALoader needs the WinUSB driver for most programmers.
   - Follow docs\windows-driver.md (ask your lab instructor first:

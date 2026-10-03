@@ -1,9 +1,12 @@
 # ICSLab FPGA Programmer - boards shown at the top of the "Board" list.
 #
-# One board per line:   <openFPGALoader board name> [= <label shown to students>]
-# Board names must match "openFPGALoader --list-boards" (all other supported
-# boards are still listed below these). Lines starting with # are ignored.
-# Edit this file to match the boards of your laboratory; no rebuild needed.
+# One board per line:
+#   <name> [= <label shown to students>] [| cable=<openFPGALoader cable>]
+# <name> is an openFPGALoader board ("openFPGALoader --list-boards"). For a
+# board openFPGALoader has no entry for, use any name together with
+# "| cable=..." (e.g. usb-blaster, usb-blasterII): only the cable is passed.
+# All other supported boards are still listed below these. Lines starting
+# with # are ignored. Edit this file for your laboratory; no rebuild needed.
 
 basys3        = Digilent Basys 3
 nexys_a7_100  = Digilent Nexys A7-100T
@@ -16,3 +19,8 @@ cmoda7_35t    = Digilent Cmod A7-35T
 de10lite      = Terasic DE10-Lite
 de0nano       = Terasic DE0-Nano
 tangnano9k    = Sipeed Tang Nano 9K
+
+# Intel/Altera boards with an on-board USB-Blaster (check the USB ID in
+# "USB Setup...": 09FB:6001 = usb-blaster, 09FB:6010/6810 = usb-blasterII)
+de2_standard  = Terasic DE2-Standard | cable=usb-blasterII
+de2_115       = Terasic DE2-115      | cable=usb-blaster

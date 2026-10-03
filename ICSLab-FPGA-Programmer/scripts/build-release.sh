@@ -130,6 +130,9 @@ cp -r "$BACKEND_STAGE/share/openFPGALoader" "$PKG/backend/share/"
 cp "$GUI_DIR"/LICENSES/* "$PKG/LICENSES/"
 cp "$GUI_DIR/docs/student-guide.md" "$GUI_DIR/docs/windows-driver.md" "$PKG/docs/"
 cp "$GUI_DIR/resources/lab-boards.txt" "$PKG/"
+mkdir -p "$PKG/firmware"
+to_crlf_early() { sed 's/\r$//; s/$/\r/' "$1" > "$2"; }
+to_crlf_early "$GUI_DIR/resources/firmware-README.txt" "$PKG/firmware/README.txt"
 to_crlf() { sed 's/\r$//; s/$/\r/' "$1" > "$2"; }
 to_crlf "$GUI_DIR/resources/README.txt" "$PKG/README.txt"
 to_crlf "$GUI_DIR/README-licenses.txt" "$PKG/README-licenses.txt"
