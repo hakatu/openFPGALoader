@@ -398,6 +398,7 @@ const std::vector<std::string> &knownBitstreamExtensions()
 	static const std::vector<std::string> exts = {
 		"bit", "bin", "svf", "jed", "hex", "fs", "rbf", "rpd", "mcs",
 		"pof", "dfu", "cfg", "fea", "pdi", "pub", "raw",
+		"sof", // converted to .rbf by the GUI (Quartus), see isQuartusSof()
 	};
 	return exts;
 }
@@ -430,7 +431,7 @@ std::string openFileFilter()
 		patterns += "*." + e + ";*." + e + ".gz";
 	}
 	std::string f;
-	f += "FPGA bitstreams (*.bit, *.bin, *.svf, *.jed, *.hex, ...)";
+	f += "FPGA bitstreams (*.bit, *.bin, *.sof, *.rbf, *.svf, *.jed, ...)";
 	f.push_back('\0');
 	f += patterns;
 	f.push_back('\0');
@@ -820,6 +821,50 @@ bool isWinUsbService(const std::string &service)
 }
 
 /* ------------------------------------------------------------------------ */
+/* Quartus .sof files                                                       */
+/* ------------------------------------------------------------------------ */
+
+bool isQuartusSof(const std::string &path)
+{
+	const std::string base = toLower(fileBaseName(path));
+	return base.size() > 4 && base.compare(base.size() - 4, 4, ".sof") == 0;
+}
+
+std::string siblingRbf(const std::string &sofPath)
+{
+	if (!isQuartusSof(sofPath))
+		return std::string();
+	return sofPath.substr(0, sofPath.size() - 4) + ".rbf";
+}
+
+std::vector<std::string> buildSofToRbfArgs(const std::string &sof, const std::string &rbf)
+{
+	// Same command as openFPGALoader's documentation (doc/vendors/intel.rst)
+	return {"--option=bitstream_compression=off", "-c", sof, rbf};
+}
+
+std::vector<std::string> quartusToolCandidates(const std::string &exeName,
+	const std::string &quartusRootDir, const std::vector<std::string> &quartusVersionDirs)
+{
+	std::vector<std::string> out;
+	auto add = [&](const std::string &p) {
+		if (std::find(out.begin(), out.end(), p) == out.end())
+			out.push_back(p);
+	};
+	auto addTool = [&](const std::string &toolDir) {
+		add(joinPath(joinPath(toolDir, "bin64"), exeName));
+		add(joinPath(joinPath(toolDir, "bin"), exeName));
+	};
+	if (!quartusRootDir.empty())
+		addTool(quartusRootDir);
+	for (const auto &v : quartusVersionDirs) {
+		addTool(joinPath(v, "quartus"));
+		addTool(joinPath(v, "qprogrammer"));
+	}
+	return out;
+}
+
+/* ------------------------------------------------------------------------ */
 /* Result interpretation                                                    */
 /* ------------------------------------------------------------------------ */
 
@@ -925,6 +970,37 @@ FailureInfo classifyResult(int exitCode, const std::string &rawOutput)
 			std::to_string(exitCode) + ").";
 		info.checks = kHardwareChecks;
 	}
+	return info;
+}
+
+FailureInfo sofNeedsConversionInfo(const std::string &sofPath)
+{
+	FailureInfo info;
+	info.kind = FailureKind::SofConversion;
+	info.title = "This is a Quartus .sof file, which cannot be programmed directly.";
+	info.explanation = "openFPGALoader needs a .rbf (or .svf) file, and Quartus is not "
+		"installed on this PC to convert \"" + fileBaseName(sofPath) + "\" automatically.";
+	info.checks = {
+		"on a PC with Quartus: File > Convert Programming Files > \"Raw Binary File (.rbf)\", "
+			"then select the .rbf here",
+		"or add to the project's .qsf file, then compile again and select "
+			"output_files\\" + fileBaseName(siblingRbf(sofPath)) + ":\r\n"
+			"      set_global_assignment -name GENERATE_RBF_FILE ON\r\n"
+			"      set_global_assignment -name ON_CHIP_BITSTREAM_DECOMPRESSION OFF",
+	};
+	return info;
+}
+
+FailureInfo sofConversionFailedInfo(int exitCode)
+{
+	FailureInfo info;
+	info.kind = FailureKind::SofConversion;
+	info.title = "Converting the .sof file to .rbf failed.";
+	info.explanation = "Quartus (quartus_cpf) reported an error (exit code " +
+		std::to_string(exitCode) + "). Nothing was programmed.";
+	info.checks = {"the .sof file is complete (compilation finished without errors)",
+		"or convert it in Quartus: File > Convert Programming Files > \"Raw Binary File (.rbf)\", "
+			"and select the .rbf"};
 	return info;
 }
 

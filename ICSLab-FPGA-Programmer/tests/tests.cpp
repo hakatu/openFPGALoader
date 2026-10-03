@@ -511,6 +511,56 @@ TEST(blaster_error_mapping)
 	CHECK_EQ(classifyResult(1, "Error: fail to open C:\\x.bit").kind, FailureKind::BadBitstream);
 }
 
+TEST(quartus_sof_helpers)
+{
+	const std::string sof = "C:\\Users\\Student Name\\lab 3\\output_files\\top.sof";
+	CHECK(isQuartusSof(sof));
+	CHECK(isQuartusSof("C:\\x\\TOP.SOF"));
+	CHECK(!isQuartusSof("C:\\x\\top.rbf"));
+	CHECK(!isQuartusSof("C:\\x\\sof"));
+	CHECK_EQ(siblingRbf(sof), "C:\\Users\\Student Name\\lab 3\\output_files\\top.rbf");
+	CHECK_EQ(siblingRbf("C:\\x\\top.bit"), "");
+	auto args = buildSofToRbfArgs(sof, "C:\\tmp\\converted.rbf");
+	CHECK_EQ(args, (std::vector<std::string>{"--option=bitstream_compression=off", "-c", sof,
+		"C:\\tmp\\converted.rbf"}));
+	auto argv = splitWindowsCommandLine(buildCommandLine("quartus_cpf.exe", args));
+	CHECK_EQ(argv.size(), size_t(5));
+	if (argv.size() == 5)
+		CHECK_EQ(argv[3], sof);
+	// .sof is accepted by the file checks (converted before programming)
+	auto exists = [&](const std::string &p) { return p == sof; };
+	CHECK_EQ(checkBitstream(sof, exists), BitstreamCheck::Ok);
+	CHECK(openFileFilter().find("*.sof") != std::string::npos);
+
+	auto c = quartusToolCandidates("quartus_cpf.exe", "D:\\q\\quartus", {"C:\\intelFPGA_lite\\20.1"});
+	CHECK(!c.empty());
+	if (!c.empty())
+		CHECK_EQ(c[0], "D:\\q\\quartus\\bin64\\quartus_cpf.exe");
+	bool lite = false, prog = false;
+	for (const auto &x : c) {
+		lite |= x == "C:\\intelFPGA_lite\\20.1\\quartus\\bin64\\quartus_cpf.exe";
+		prog |= x == "C:\\intelFPGA_lite\\20.1\\qprogrammer\\bin64\\quartus_cpf.exe";
+	}
+	CHECK(lite);
+	CHECK(prog);
+}
+
+TEST(sof_messages)
+{
+	auto info = sofNeedsConversionInfo("C:\\p\\output_files\\top.sof");
+	CHECK_EQ(info.kind, FailureKind::SofConversion);
+	std::string t = formatFailure(info);
+	CHECK(t.find(".sof") != std::string::npos);
+	CHECK(t.find("Convert Programming Files") != std::string::npos);
+	CHECK(t.find("GENERATE_RBF_FILE ON") != std::string::npos);
+	CHECK(t.find("ON_CHIP_BITSTREAM_DECOMPRESSION OFF") != std::string::npos);
+	CHECK(t.find("output_files\\top.rbf") != std::string::npos);
+	auto f = sofConversionFailedInfo(3);
+	CHECK_EQ(f.kind, FailureKind::SofConversion);
+	CHECK(formatFailure(f).find("exit code 3") != std::string::npos);
+	CHECK(formatFailure(f).find("Nothing was programmed") != std::string::npos);
+}
+
 TEST(strip_ansi)
 {
 	CHECK_EQ(stripAnsi("\x1b[31mError\x1b[0m done"), "Error done");
@@ -682,6 +732,38 @@ TEST(win_blaster_firmware_lookup)
 	CHECK_EQ(findBlasterFirmware(app, configured), app + "\\firmware\\blaster_6810.hex");
 	writeFile(configured, ":00000001FF\n");
 	CHECK_EQ(findBlasterFirmware(app, configured), configured); // instructor's choice first
+}
+
+TEST(win_quartus_tool_lookup_and_conversion)
+{
+	// Fake Quartus installation found through QUARTUS_ROOTDIR
+	const std::string q = g_tmp + "\\Fake Quartus\\quartus";
+	CreateDirectoryW(widen(g_tmp + "\\Fake Quartus").c_str(), nullptr);
+	CreateDirectoryW(widen(q).c_str(), nullptr);
+	CreateDirectoryW(widen(q + "\\bin64").c_str(), nullptr);
+	const std::string cpf = q + "\\bin64\\quartus_cpf.exe";
+	CHECK(copyTo(g_fake, cpf));
+	SetEnvironmentVariableW(L"QUARTUS_ROOTDIR", widen(q).c_str());
+	CHECK_EQ(findQuartusTool("quartus_cpf.exe"), cpf);
+	SetEnvironmentVariableW(L"QUARTUS_ROOTDIR", nullptr);
+	CHECK_EQ(findQuartusTool("quartus_cpf_does_not_exist.exe"), "");
+
+	// Conversion through the same command line the GUI uses
+	const std::string sof = g_tmp + "\\Student Name lab\\top.sof";
+	CreateDirectoryW(widen(g_tmp + "\\Student Name lab").c_str(), nullptr);
+	writeFile(sof, "SOF-CONTENT");
+	const std::string rbf = g_tmp + "\\converted test.rbf";
+	DeleteFileW(widen(rbf).c_str());
+	auto r = runProcess(cpf, buildSofToRbfArgs(sof, rbf), nullptr);
+	CHECK(r.launched);
+	CHECK_EQ(r.exitCode, 0);
+	CHECK(fileExists(rbf));
+	auto bad = runProcess(cpf, {"--option=fail", "-c", sof, rbf}, nullptr);
+	CHECK_EQ(bad.exitCode, 3);
+
+	// sibling .rbf freshness
+	CHECK(isFileNotOlder(rbf, sof));
+	CHECK(!isFileNotOlder(g_tmp + "\\missing.rbf", sof));
 }
 
 TEST(win_real_backend_integration)

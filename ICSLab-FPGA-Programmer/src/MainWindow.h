@@ -42,6 +42,8 @@ private:
 	struct WorkerDone {
 		Task task = Task::None;
 		std::vector<ProcessResult> runs;
+		bool converted = false;   // a .sof conversion was attempted
+		ProcessResult convert;    // its result
 		std::string summary;  // detect summary
 		bool ok = false;
 	};
@@ -82,7 +84,8 @@ private:
 
 	void startWorker(Task task, std::vector<std::vector<std::string>> runs,
 		std::string detectBoard = std::string(), std::string detectCable = std::string(),
-		std::string firmware = std::string());
+		std::string firmware = std::string(), std::string convertExe = std::string(),
+		std::vector<std::string> convertArgs = std::vector<std::string>());
 	static DWORD WINAPI workerMain(LPVOID param);
 
 	void setBusy(bool busy);
@@ -145,6 +148,8 @@ private:
 		std::vector<std::vector<std::string>> runs;
 		std::string detectBoard, detectCable;
 		std::string firmware; // USB-Blaster II firmware ("" if not needed)
+		std::string convertExe; // quartus_cpf.exe when a .sof must be converted
+		std::vector<std::string> convertArgs;
 	};
 };
 

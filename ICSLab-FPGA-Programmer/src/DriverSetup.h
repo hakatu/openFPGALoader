@@ -64,4 +64,12 @@ int driverSetupHelperMain(int argc, wchar_t **argv);
 // Locate blaster_6810.hex (configured path, app firmware folder, Quartus installs).
 std::string findBlasterFirmware(const std::string &exeDir, const std::string &configuredPath);
 
+// Quartus / Quartus Programmer version folders (C:\intelFPGA_lite\23.1, ...),
+// newest first.
+std::vector<std::string> installedQuartusVersionDirs();
+// Full path of a Quartus tool such as "quartus_cpf.exe" ("" if not installed).
+std::string findQuartusTool(const std::string &exeName);
+// true when file a exists and is not older than file b.
+bool isFileNotOlder(const std::string &a, const std::string &b);
+
 } // namespace icslab

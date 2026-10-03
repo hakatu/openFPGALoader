@@ -7,6 +7,8 @@
 // - "--fake-stderr"   : also writes a line to stderr
 // - "--fake-progress" : prints openFPGALoader style progress lines
 // - "--fake-stdin"    : tries to read stdin (must get EOF immediately)
+// - quartus_cpf mode: "--option=... -c <in.sof> <out.rbf>" copies in to out
+//   ("--option=fail" exits with code 3 instead)
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -33,6 +35,16 @@ int main()
 	int argc = 0;
 	wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 	int exitCode = 0;
+	if (argc == 5 && !std::wcsncmp(argv[1], L"--option=", 9) && !std::wcscmp(argv[2], L"-c")) {
+		std::printf("Fake quartus_cpf: converting\n");
+		int rc = 0;
+		if (!std::wcscmp(argv[1], L"--option=fail"))
+			rc = 3;
+		else if (!CopyFileW(argv[3], argv[4], FALSE))
+			rc = 2;
+		LocalFree(argv);
+		return rc;
+	}
 	for (int i = 1; i < argc; ++i) {
 		std::printf("ARG%d=%s\n", i, utf8(argv[i]).c_str());
 		if (!std::wcscmp(argv[i], L"--fake-exit") && i + 1 < argc)

@@ -358,14 +358,43 @@ bool isProcessElevated()
 	return r;
 }
 
-std::string findBlasterFirmware(const std::string &exeDir, const std::string &configuredPath)
+std::vector<std::string> installedQuartusVersionDirs()
 {
-	std::string sysDrive = envVar(L"SystemDrive");
 	std::vector<std::string> versions;
-	for (const auto &root : quartusInstallRoots(sysDrive)) {
+	for (const auto &root : quartusInstallRoots(envVar(L"SystemDrive"))) {
 		auto v = subDirectories(root);
 		versions.insert(versions.end(), v.begin(), v.end());
 	}
+	return versions;
+}
+
+std::string findQuartusTool(const std::string &exeName)
+{
+	for (const auto &c : quartusToolCandidates(exeName, envVar(L"QUARTUS_ROOTDIR"),
+			installedQuartusVersionDirs())) {
+		if (fileExists(c))
+			return c;
+	}
+	// Quartus's bin64 folder on PATH
+	wchar_t buf[MAX_PATH * 2];
+	DWORD n = SearchPathW(nullptr, widen(exeName).c_str(), nullptr, MAX_PATH * 2, buf, nullptr);
+	if (n > 0 && n < MAX_PATH * 2)
+		return narrow(buf);
+	return std::string();
+}
+
+bool isFileNotOlder(const std::string &a, const std::string &b)
+{
+	WIN32_FILE_ATTRIBUTE_DATA fa, fb;
+	if (!GetFileAttributesExW(widen(a).c_str(), GetFileExInfoStandard, &fa) ||
+			!GetFileAttributesExW(widen(b).c_str(), GetFileExInfoStandard, &fb))
+		return false;
+	return CompareFileTime(&fa.ftLastWriteTime, &fb.ftLastWriteTime) >= 0;
+}
+
+std::string findBlasterFirmware(const std::string &exeDir, const std::string &configuredPath)
+{
+	const std::vector<std::string> versions = installedQuartusVersionDirs();
 	for (const auto &c : blasterFirmwareCandidates(exeDir, configuredPath,
 			envVar(L"QUARTUS_ROOTDIR"), versions)) {
 		if (fileExists(c))

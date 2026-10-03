@@ -191,6 +191,22 @@ std::string describeDeviceProblem(unsigned long problemCode);
 bool isWinUsbService(const std::string &service);
 
 /* ------------------------------------------------------------------------ */
+/* Quartus .sof files                                                       */
+/* ------------------------------------------------------------------------ */
+
+// openFPGALoader cannot program Intel's .sof format: the GUI converts it to
+// an uncompressed .rbf with Quartus's quartus_cpf when Quartus is installed.
+bool isQuartusSof(const std::string &path);
+// "C:\p\output_files\top.sof" -> "C:\p\output_files\top.rbf"
+std::string siblingRbf(const std::string &sofPath);
+// quartus_cpf arguments for an uncompressed .rbf (JTAG configuration cannot
+// use compressed bitstreams).
+std::vector<std::string> buildSofToRbfArgs(const std::string &sof, const std::string &rbf);
+// Candidate locations of a Quartus tool (e.g. "quartus_cpf.exe").
+std::vector<std::string> quartusToolCandidates(const std::string &exeName,
+	const std::string &quartusRootDir, const std::vector<std::string> &quartusVersionDirs);
+
+/* ------------------------------------------------------------------------ */
 /* Result interpretation                                                    */
 /* ------------------------------------------------------------------------ */
 
@@ -206,6 +222,7 @@ enum class FailureKind {
 	FlashFailed,    // flash erase/write/verify failed
 	MultipleFpga,
 	BlasterFirmware, // USB-Blaster II firmware missing
+	SofConversion,   // .sof selected and it could not be converted
 	Unknown,
 };
 
@@ -221,5 +238,9 @@ FailureInfo classifyResult(int exitCode, const std::string &output);
 FailureInfo backendMissingInfo(const std::string &exeDir);
 FailureInfo launchFailedInfo(const std::string &reason);
 std::string formatFailure(const FailureInfo &info);
+// .sof selected but Quartus (quartus_cpf) is not installed on this PC.
+FailureInfo sofNeedsConversionInfo(const std::string &sofPath);
+// quartus_cpf ran but failed.
+FailureInfo sofConversionFailedInfo(int exitCode);
 
 } // namespace icslab

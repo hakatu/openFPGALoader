@@ -49,15 +49,23 @@ openFPGALoader
 | ![flash confirmation](docs/screenshots/04-flash-confirm.png) | ![backend missing](docs/screenshots/05-backend-missing.png) |
 
 | ![USB Setup](docs/screenshots/06-usb-setup.png) | ![DE2-Standard, firmware missing](docs/screenshots/07-de2-standard.png) |
+| ![.sof converted automatically](docs/screenshots/08-sof-converted.png) | ![.sof without Quartus](docs/screenshots/09-sof-no-quartus.png) |
 
 (Screenshots taken under Wine. On Windows the controls use the native Windows 10/11 theme.)
 
 ## For lab instructors
 
-* **Distribution:** `ICSLab-FPGA-Programmer-v1.1.0-win64.zip`. Students
+* **Distribution:** `ICSLab-FPGA-Programmer-v1.2.0-win64.zip`. Students
   extract it anywhere (Desktop, Downloads, a USB stick) and run the `.exe`.
   No installation or administrator rights. An optional per-user installer
   (`ICSLab-FPGA-Programmer-Setup.exe`, Inno Setup) is built by CI.
+* **Quartus `.sof` files:** students can select the `.sof`. The application
+  uses an up-to-date `<top>.rbf` next to it if present, otherwise converts it
+  with Quartus's `quartus_cpf` (uncompressed `.rbf`, as JTAG configuration
+  requires). Tip: add `set_global_assignment -name GENERATE_RBF_FILE ON` and
+  `set_global_assignment -name ON_CHIP_BITSTREAM_DECOMPRESSION OFF` to the lab
+  template `.qsf` so every compile also writes the `.rbf` (works on PCs
+  without Quartus too).
 * **Lab board list:** edit `lab-boards.txt` next to the `.exe` to choose which
   boards appear first. All boards supported by openFPGALoader
   (`openFPGALoader --list-boards`, read at runtime) are listed below them.
@@ -146,7 +154,7 @@ ICSLab-FPGA-Programmer/release/
 │   ├── docs/, LICENSES/, lab-boards.txt
 │   ├── README.txt
 │   └── README-licenses.txt
-├── ICSLab-FPGA-Programmer-v1.1.0-win64.zip
+├── ICSLab-FPGA-Programmer-v1.2.0-win64.zip
 ├── SHA256SUMS.txt
 └── dependencies.txt          (DLL imports of both executables)
 ```
