@@ -545,6 +545,47 @@ TEST(quartus_sof_helpers)
 	CHECK(prog);
 }
 
+TEST(quartus_version_order)
+{
+	std::vector<std::string> v = {"C:\\altera\\13.0sp1", "C:\\intelFPGA_lite\\23.1",
+		"C:\\altera\\9.1sp2", "C:\\intelFPGA_lite\\20.1", "C:\\altera\\13.0",
+		"D:\\intelFPGA\\18.1", "C:\\intelFPGA_lite\\23.1std"};
+	sortQuartusVersionDirsNewestFirst(v);
+	CHECK_EQ(v, (std::vector<std::string>{"C:\\intelFPGA_lite\\23.1std", "C:\\intelFPGA_lite\\23.1",
+		"C:\\intelFPGA_lite\\20.1", "D:\\intelFPGA\\18.1", "C:\\altera\\13.0sp1",
+		"C:\\altera\\13.0", "C:\\altera\\9.1sp2"}));
+	CHECK(quartusVersionNewer("23.1", "9.1"));    // not a text comparison
+	CHECK(!quartusVersionNewer("9.1", "23.1"));
+	CHECK(quartusVersionNewer("13.0sp1", "13.0"));
+
+	auto roots = quartusInstallRoots("D:");
+	bool alteraD = false, intelD = false;
+	for (const auto &r : roots) {
+		alteraD |= r == "D:\\altera";
+		intelD |= r == "D:\\intelFPGA_lite";
+	}
+	CHECK(alteraD);
+	CHECK(intelD);
+
+	CHECK_EQ(quartusVersionOfTool("C:\\altera\\13.0sp1\\quartus\\bin64\\quartus_cpf.exe"), "13.0sp1");
+	CHECK_EQ(quartusVersionOfTool("C:\\intelFPGA_lite\\20.1\\qprogrammer\\bin\\quartus_cpf.exe"), "20.1");
+
+	// 32-bit Quartus II installs only have quartus\bin
+	auto c = quartusToolCandidates("quartus_cpf.exe", "", {"C:\\altera\\13.0sp1"});
+	bool bin = false, bin64 = false;
+	for (const auto &x : c) {
+		bin |= x == "C:\\altera\\13.0sp1\\quartus\\bin\\quartus_cpf.exe";
+		bin64 |= x == "C:\\altera\\13.0sp1\\quartus\\bin64\\quartus_cpf.exe";
+	}
+	CHECK(bin);
+	CHECK(bin64);
+
+	auto f = sofConversionFailedInfo(3, {"23.1", "13.0sp1"});
+	std::string t = formatFailure(f);
+	CHECK(t.find("23.1, 13.0sp1") != std::string::npos);
+	CHECK(t.find("Cyclone II") != std::string::npos);
+}
+
 TEST(sof_messages)
 {
 	auto info = sofNeedsConversionInfo("C:\\p\\output_files\\top.sof");
@@ -764,6 +805,54 @@ TEST(win_quartus_tool_lookup_and_conversion)
 	// sibling .rbf freshness
 	CHECK(isFileNotOlder(rbf, sof));
 	CHECK(!isFileNotOlder(g_tmp + "\\missing.rbf", sof));
+}
+
+TEST(win_quartus_multiple_installs)
+{
+	// Old Quartus II under C:\altera next to a newer (broken) Quartus: both are
+	// found, newest first, so the GUI can fall back to the older one.
+	const std::string oldBin = "C:\\altera\\13.0sp1\\quartus\\bin64";
+	const std::string newBin = "C:\\intelFPGA_lite\\99.9fail\\quartus\\bin64";
+	for (const char *d : {"C:\\altera", "C:\\altera\\13.0sp1", "C:\\altera\\13.0sp1\\quartus",
+			"C:\\intelFPGA_lite", "C:\\intelFPGA_lite\\99.9fail",
+			"C:\\intelFPGA_lite\\99.9fail\\quartus"})
+		CreateDirectoryW(widen(d).c_str(), nullptr);
+	CreateDirectoryW(widen(oldBin).c_str(), nullptr);
+	CreateDirectoryW(widen(newBin).c_str(), nullptr);
+	CHECK(copyTo(g_fake, oldBin + "\\quartus_cpf.exe"));
+	CHECK(copyTo(g_fake, newBin + "\\quartus_cpf.exe"));
+	SetEnvironmentVariableW(L"QUARTUS_ROOTDIR", nullptr);
+
+	auto tools = findQuartusTools("quartus_cpf.exe");
+	CHECK(tools.size() >= 2);
+	if (tools.size() >= 2) {
+		CHECK_EQ(tools[0], newBin + "\\quartus_cpf.exe");
+		CHECK_EQ(tools[1], oldBin + "\\quartus_cpf.exe");
+	}
+	auto dirs = installedQuartusVersionDirs();
+	bool hasOld = false;
+	for (const auto &d : dirs)
+		hasOld |= d == "C:\\altera\\13.0sp1";
+	CHECK(hasOld);
+
+	// newest fails, the 13.0sp1 one converts
+	const std::string sof = g_tmp + "\\de2.sof";
+	const std::string rbf = g_tmp + "\\de2 out.rbf";
+	writeFile(sof, "SOF");
+	DeleteFileW(widen(rbf).c_str());
+	if (tools.size() >= 2) {
+		CHECK_EQ(runProcess(tools[0], buildSofToRbfArgs(sof, rbf), nullptr).exitCode, 3);
+		CHECK_EQ(runProcess(tools[1], buildSofToRbfArgs(sof, rbf), nullptr).exitCode, 0);
+		CHECK(fileExists(rbf));
+	}
+	// cleanup so other tests and runs start clean
+	for (const auto &b : {oldBin, newBin})
+		DeleteFileW(widen(b + "\\quartus_cpf.exe").c_str());
+	for (const char *d : {"C:\\altera\\13.0sp1\\quartus\\bin64", "C:\\altera\\13.0sp1\\quartus",
+			"C:\\altera\\13.0sp1", "C:\\altera", "C:\\intelFPGA_lite\\99.9fail\\quartus\\bin64",
+			"C:\\intelFPGA_lite\\99.9fail\\quartus", "C:\\intelFPGA_lite\\99.9fail",
+			"C:\\intelFPGA_lite"})
+		RemoveDirectoryW(widen(d).c_str());
 }
 
 TEST(win_real_backend_integration)

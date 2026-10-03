@@ -67,7 +67,12 @@ std::string findBlasterFirmware(const std::string &exeDir, const std::string &co
 // Quartus / Quartus Programmer version folders (C:\intelFPGA_lite\23.1, ...),
 // newest first.
 std::vector<std::string> installedQuartusVersionDirs();
-// Full path of a Quartus tool such as "quartus_cpf.exe" ("" if not installed).
+// Every installed copy of a Quartus tool such as "quartus_cpf.exe":
+// $QUARTUS_ROOTDIR first, then all Quartus / Quartus II versions found under
+// <drive>:\\intelFPGA*, <drive>:\\altera* on every local disk (newest first),
+// then PATH.
+std::vector<std::string> findQuartusTools(const std::string &exeName);
+// First of findQuartusTools() ("" if Quartus is not installed).
 std::string findQuartusTool(const std::string &exeName);
 // true when file a exists and is not older than file b.
 bool isFileNotOlder(const std::string &a, const std::string &b);

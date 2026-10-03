@@ -183,8 +183,16 @@ const char *blasterFirmwareFileName(); // "blaster_6810.hex"
 std::vector<std::string> blasterFirmwareCandidates(const std::string &exeDir,
 	const std::string &configuredPath, const std::string &quartusRootDir,
 	const std::vector<std::string> &quartusVersionDirs);
-// Base folders that contain Quartus versions (C:\intelFPGA_lite, ...).
-std::vector<std::string> quartusInstallRoots(const std::string &systemDrive);
+// Base folders that contain Quartus versions on one drive: intelFPGA_lite,
+// intelFPGA, intelFPGA_pro, intelFPGA_standard and, for older releases
+// (Quartus II 13.x and earlier, still needed for Cyclone II boards such as the
+// original DE2), altera, altera_lite, altera_pro.
+std::vector<std::string> quartusInstallRoots(const std::string &drive);
+// Version folder names compared naturally ("23.1" > "13.0sp1" > "9.1sp2").
+bool quartusVersionNewer(const std::string &dirA, const std::string &dirB);
+void sortQuartusVersionDirsNewestFirst(std::vector<std::string> &dirs);
+// "C:\altera\13.0sp1\quartus\bin64\quartus_cpf.exe" -> "13.0sp1"
+std::string quartusVersionOfTool(const std::string &toolPath);
 
 // Windows Device Manager problem code (CM_PROB_*) -> short explanation.
 std::string describeDeviceProblem(unsigned long problemCode);
@@ -240,7 +248,8 @@ FailureInfo launchFailedInfo(const std::string &reason);
 std::string formatFailure(const FailureInfo &info);
 // .sof selected but Quartus (quartus_cpf) is not installed on this PC.
 FailureInfo sofNeedsConversionInfo(const std::string &sofPath);
-// quartus_cpf ran but failed.
-FailureInfo sofConversionFailedInfo(int exitCode);
+// quartus_cpf ran but failed with every installed Quartus version tried.
+FailureInfo sofConversionFailedInfo(int exitCode,
+	const std::vector<std::string> &triedVersions = std::vector<std::string>());
 
 } // namespace icslab

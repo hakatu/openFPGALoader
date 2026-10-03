@@ -218,7 +218,22 @@ std::vector<std::string> subDirectories(const std::string &dir)
 			out.push_back(dir + "\\" + narrow(fd.cFileName));
 	} while (FindNextFileW(h, &fd));
 	FindClose(h);
-	std::sort(out.rbegin(), out.rend()); // newest version first
+	sortQuartusVersionDirsNewestFirst(out);
+	return out;
+}
+
+// "C:", "D:", ... for local fixed disks (Quartus may be installed on D:).
+std::vector<std::string> localFixedDrives()
+{
+	std::vector<std::string> out;
+	DWORD mask = GetLogicalDrives();
+	for (int i = 0; i < 26; ++i) {
+		if (!(mask & (1u << i)))
+			continue;
+		wchar_t root[4] = {static_cast<wchar_t>(L'A' + i), L':', L'\\', 0};
+		if (GetDriveTypeW(root) == DRIVE_FIXED)
+			out.push_back(std::string(1, static_cast<char>('A' + i)) + ":");
+	}
 	return out;
 }
 
@@ -360,27 +375,53 @@ bool isProcessElevated()
 
 std::vector<std::string> installedQuartusVersionDirs()
 {
-	std::vector<std::string> versions;
-	for (const auto &root : quartusInstallRoots(envVar(L"SystemDrive"))) {
-		auto v = subDirectories(root);
-		versions.insert(versions.end(), v.begin(), v.end());
+	// System drive first, then the other local disks.
+	std::vector<std::string> drives;
+	std::string sys = envVar(L"SystemDrive");
+	if (!sys.empty())
+		drives.push_back(sys);
+	for (const auto &d : localFixedDrives()) {
+		if (_stricmp(d.c_str(), sys.c_str()) != 0)
+			drives.push_back(d);
 	}
+	std::vector<std::string> versions;
+	for (const auto &drive : drives) {
+		for (const auto &root : quartusInstallRoots(drive)) {
+			auto v = subDirectories(root);
+			versions.insert(versions.end(), v.begin(), v.end());
+		}
+	}
+	// C:\\altera\\13.0sp1 and C:\\intelFPGA_lite\\23.1 sorted together, newest first
+	sortQuartusVersionDirsNewestFirst(versions);
 	return versions;
+}
+
+std::vector<std::string> findQuartusTools(const std::string &exeName)
+{
+	std::vector<std::string> found;
+	auto add = [&](const std::string &p) {
+		for (const auto &f : found)
+			if (_stricmp(f.c_str(), p.c_str()) == 0)
+				return;
+		found.push_back(p);
+	};
+	for (const auto &c : quartusToolCandidates(exeName, envVar(L"QUARTUS_ROOTDIR"),
+			installedQuartusVersionDirs())) {
+		if (fileExists(c))
+			add(c);
+	}
+	// Quartus's bin64 folder on PATH (custom install locations)
+	wchar_t buf[MAX_PATH * 2];
+	DWORD n = SearchPathW(nullptr, widen(exeName).c_str(), nullptr, MAX_PATH * 2, buf, nullptr);
+	if (n > 0 && n < MAX_PATH * 2)
+		add(narrow(buf));
+	return found;
 }
 
 std::string findQuartusTool(const std::string &exeName)
 {
-	for (const auto &c : quartusToolCandidates(exeName, envVar(L"QUARTUS_ROOTDIR"),
-			installedQuartusVersionDirs())) {
-		if (fileExists(c))
-			return c;
-	}
-	// Quartus's bin64 folder on PATH
-	wchar_t buf[MAX_PATH * 2];
-	DWORD n = SearchPathW(nullptr, widen(exeName).c_str(), nullptr, MAX_PATH * 2, buf, nullptr);
-	if (n > 0 && n < MAX_PATH * 2)
-		return narrow(buf);
-	return std::string();
+	auto all = findQuartusTools(exeName);
+	return all.empty() ? std::string() : all.front();
 }
 
 bool isFileNotOlder(const std::string &a, const std::string &b)

@@ -756,9 +756,9 @@ bool cableNeedsBlasterFirmware(const std::string &cable)
 
 const char *blasterFirmwareFileName() { return "blaster_6810.hex"; }
 
-std::vector<std::string> quartusInstallRoots(const std::string &systemDrive)
+std::vector<std::string> quartusInstallRoots(const std::string &drive)
 {
-	std::string d = systemDrive.empty() ? std::string("C:") : systemDrive;
+	std::string d = drive.empty() ? std::string("C:") : drive;
 	if (!d.empty() && isPathSeparator(d.back()))
 		d.pop_back();
 	std::vector<std::string> roots;
@@ -766,6 +766,47 @@ std::vector<std::string> quartusInstallRoots(const std::string &systemDrive)
 			"altera_lite", "altera", "altera_pro"})
 		roots.push_back(d + "\\" + n);
 	return roots;
+}
+
+bool quartusVersionNewer(const std::string &dirA, const std::string &dirB)
+{
+	// Natural comparison of the version folder names: digit runs compare
+	// numerically, everything else case-insensitively.
+	const std::string a = toLower(fileBaseName(dirA)), b = toLower(fileBaseName(dirB));
+	size_t i = 0, j = 0;
+	while (i < a.size() && j < b.size()) {
+		const bool da = std::isdigit(static_cast<unsigned char>(a[i])) != 0;
+		const bool db = std::isdigit(static_cast<unsigned char>(b[j])) != 0;
+		if (da && db) {
+			size_t ei = i, ej = j;
+			while (ei < a.size() && std::isdigit(static_cast<unsigned char>(a[ei]))) ++ei;
+			while (ej < b.size() && std::isdigit(static_cast<unsigned char>(b[ej]))) ++ej;
+			const unsigned long na = std::strtoul(a.substr(i, ei - i).c_str(), nullptr, 10);
+			const unsigned long nb = std::strtoul(b.substr(j, ej - j).c_str(), nullptr, 10);
+			if (na != nb)
+				return na > nb;
+			i = ei;
+			j = ej;
+		} else {
+			if (a[i] != b[j])
+				return a[i] > b[j];
+			++i;
+			++j;
+		}
+	}
+	return a.size() - i > b.size() - j; // "13.0sp1" newer than "13.0"
+}
+
+void sortQuartusVersionDirsNewestFirst(std::vector<std::string> &dirs)
+{
+	std::stable_sort(dirs.begin(), dirs.end(), quartusVersionNewer);
+}
+
+std::string quartusVersionOfTool(const std::string &toolPath)
+{
+	// <version>\quartus|qprogrammer\bin64|bin\tool.exe
+	std::string d = fileDirName(fileDirName(fileDirName(toolPath)));
+	return fileBaseName(d);
 }
 
 std::vector<std::string> blasterFirmwareCandidates(const std::string &exeDir,
@@ -991,14 +1032,22 @@ FailureInfo sofNeedsConversionInfo(const std::string &sofPath)
 	return info;
 }
 
-FailureInfo sofConversionFailedInfo(int exitCode)
+FailureInfo sofConversionFailedInfo(int exitCode, const std::vector<std::string> &triedVersions)
 {
 	FailureInfo info;
 	info.kind = FailureKind::SofConversion;
 	info.title = "Converting the .sof file to .rbf failed.";
 	info.explanation = "Quartus (quartus_cpf) reported an error (exit code " +
 		std::to_string(exitCode) + "). Nothing was programmed.";
+	if (!triedVersions.empty()) {
+		std::string v;
+		for (const auto &t : triedVersions)
+			v += (v.empty() ? "" : ", ") + t;
+		info.explanation += " Quartus versions tried: " + v + ".";
+	}
 	info.checks = {"the .sof file is complete (compilation finished without errors)",
+		"the .sof was made for an FPGA this Quartus version supports (the original "
+			"DE2 / Cyclone II needs Quartus II 13.0 SP1 or older)",
 		"or convert it in Quartus: File > Convert Programming Files > \"Raw Binary File (.rbf)\", "
 			"and select the .rbf"};
 	return info;

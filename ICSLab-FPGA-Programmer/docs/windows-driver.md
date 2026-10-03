@@ -77,7 +77,8 @@ by Microsoft, so it is not affected by that problem.
    verify the driver's digital signature*).
 3. **USB-Blaster II only:** the *firmware* field must show
    `blaster_6810.hex`. It is found automatically in Quartus / Quartus
-   Programmer installations (`C:\intelFPGA*\<version>\...`); otherwise click
+   Programmer installations (`C:\intelFPGA*\<version>`, older Quartus II in
+   `C:\altera\<version>`, on any local drive); otherwise click
    **Locate...** and select it. Lab tip: copy the file into the `firmware`
    folder next to `ICSLab FPGA Programmer.exe` so every user of the PC finds
    it. (Intel's file is not included in this package.)

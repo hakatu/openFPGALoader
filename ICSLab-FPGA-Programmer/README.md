@@ -55,14 +55,19 @@ openFPGALoader
 
 ## For lab instructors
 
-* **Distribution:** `ICSLab-FPGA-Programmer-v1.2.0-win64.zip`. Students
+* **Distribution:** `ICSLab-FPGA-Programmer-v1.2.1-win64.zip`. Students
   extract it anywhere (Desktop, Downloads, a USB stick) and run the `.exe`.
   No installation or administrator rights. An optional per-user installer
   (`ICSLab-FPGA-Programmer-Setup.exe`, Inno Setup) is built by CI.
 * **Quartus `.sof` files:** students can select the `.sof`. The application
   uses an up-to-date `<top>.rbf` next to it if present, otherwise converts it
   with Quartus's `quartus_cpf` (uncompressed `.rbf`, as JTAG configuration
-  requires). Tip: add `set_global_assignment -name GENERATE_RBF_FILE ON` and
+  requires). Every Quartus installation is found, on any local drive:
+  `<drive>:\intelFPGA*\<version>` and older Quartus II releases in
+  `<drive>:\altera*\<version>` (plus `QUARTUS_ROOTDIR` and `PATH`). They are
+  tried newest first; if a version cannot convert the file (e.g. a Cyclone II
+  `.sof` from the original DE2, supported only up to Quartus II 13.0 SP1) the
+  next older one is used. Tip: add `set_global_assignment -name GENERATE_RBF_FILE ON` and
   `set_global_assignment -name ON_CHIP_BITSTREAM_DECOMPRESSION OFF` to the lab
   template `.qsf` so every compile also writes the `.rbf` (works on PCs
   without Quartus too).
@@ -154,7 +159,7 @@ ICSLab-FPGA-Programmer/release/
 │   ├── docs/, LICENSES/, lab-boards.txt
 │   ├── README.txt
 │   └── README-licenses.txt
-├── ICSLab-FPGA-Programmer-v1.2.0-win64.zip
+├── ICSLab-FPGA-Programmer-v1.2.1-win64.zip
 ├── SHA256SUMS.txt
 └── dependencies.txt          (DLL imports of both executables)
 ```
