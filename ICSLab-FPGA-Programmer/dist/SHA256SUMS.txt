@@ -1,3 +1,3 @@
-0410d0d516572a2acbcb6c565b6f6288ad362174b7f74423a8e6fd6aefb6be06  ICSLab-FPGA-Programmer-v1.2.1-win64.zip
-028a85027f65e82c728a6797c4ba67ba71679f2b75d291d9477370373c69136b  ICSLab-FPGA-Programmer/ICSLab FPGA Programmer.exe
-08aec35026b913bde536d4fe477c04644eb4845eb6bb2198dd454f15f6fc3f2b  ICSLab-FPGA-Programmer/backend/openFPGALoader.exe
+b71e2a39e27a21701f3abe4967ed8939babfc92818482e6e0f37dd0e634f0592  ICSLab-FPGA-Programmer-v1.3.0-win64.zip
+782006bd4e94e42a28337583d4e765b6920f7014a27a49f20fd96ca48525f8ad  ICSLab-FPGA-Programmer/ICSLab FPGA Programmer.exe
+10ad87c49abab2304999618e956511d0801bffca070de0c3cf5b6e420300f0e2  ICSLab-FPGA-Programmer/backend/openFPGALoader.exe
