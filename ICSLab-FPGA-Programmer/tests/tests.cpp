@@ -9,6 +9,7 @@
 #include "OpenFPGALoaderBackend.h"
 
 #include <cstdio>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -477,7 +478,7 @@ TEST(lab_boards_with_cable)
 	}
 	bool de2 = false;
 	for (const auto &b : defaultLabBoards())
-		de2 |= b.name == "de2_standard" && b.cable == "usb-blasterII";
+		de2 |= b.name == "de2_standard" && !b.cable.empty();
 	CHECK(de2);
 }
 
@@ -520,6 +521,9 @@ TEST(quartus_sof_helpers)
 	CHECK(!isQuartusSof("C:\\x\\sof"));
 	CHECK_EQ(siblingRbf(sof), "C:\\Users\\Student Name\\lab 3\\output_files\\top.rbf");
 	CHECK_EQ(siblingRbf("C:\\x\\top.bit"), "");
+	CHECK_EQ(siblingSvf(sof), "C:\\Users\\Student Name\\lab 3\\output_files\\top.svf");
+	CHECK_EQ(buildSofToSvfArgs(sof, "C:\\tmp\\converted.svf"), (std::vector<std::string>{"-c",
+		"-q", "12.0MHz", "-g", "3.3", "-n", "p", sof, "C:\\tmp\\converted.svf"}));
 	auto args = buildSofToRbfArgs(sof, "C:\\tmp\\converted.rbf");
 	CHECK_EQ(args, (std::vector<std::string>{"--option=bitstream_compression=off", "-c", sof,
 		"C:\\tmp\\converted.rbf"}));
@@ -594,12 +598,39 @@ TEST(sof_messages)
 	CHECK(t.find(".sof") != std::string::npos);
 	CHECK(t.find("Convert Programming Files") != std::string::npos);
 	CHECK(t.find("GENERATE_RBF_FILE ON") != std::string::npos);
+	CHECK(t.find("GENERATE_SVF_FILE ON") != std::string::npos);
+	CHECK(t.find("top.svf") != std::string::npos);
 	CHECK(t.find("ON_CHIP_BITSTREAM_DECOMPRESSION OFF") != std::string::npos);
 	CHECK(t.find("output_files\\top.rbf") != std::string::npos);
 	auto f = sofConversionFailedInfo(3);
 	CHECK_EQ(f.kind, FailureKind::SofConversion);
 	CHECK(formatFailure(f).find("exit code 3") != std::string::npos);
 	CHECK(formatFailure(f).find("Nothing was programmed") != std::string::npos);
+}
+
+TEST(config_failed_mapping)
+{
+	// openFPGALoader SVF player output when the CONF_DONE check fails
+	auto info = classifyResult(1, "Writing SVF C:\\t\\converted.svf: [=====] 100.00%\n"
+		"TDO value 00000000 isn't the one expected: 00080000\n");
+	CHECK_EQ(info.kind, FailureKind::ConfigFailed);
+	CHECK(formatFailure(info).find("did not accept") != std::string::npos);
+	ProgressUpdate u;
+	CHECK(parseProgressLine("Writing SVF C:\\t\\converted.svf: [=====     ] 52.00%", u));
+	CHECK_EQ(describePhase(u.phase), "Programming (SVF)");
+}
+
+TEST(intel_lab_boards)
+{
+	std::map<std::string, std::string> cable;
+	for (const auto &b : defaultLabBoards())
+		cable[b.name] = b.cable;
+	CHECK_EQ(cable.count("de2_standard"), size_t(1));
+	CHECK_EQ(cable["de2_standard"], "usb-blaster"); // on-board blaster is 09FB:6001
+	CHECK_EQ(cable["de2_115"], "usb-blaster");
+	CHECK_EQ(cable["de1"], "usb-blaster");
+	CHECK_EQ(cable.count("de1Soc"), size_t(1)); // openFPGALoader board entry
+	CHECK_EQ(cable["de1Soc"], "");
 }
 
 TEST(strip_ansi)
@@ -799,6 +830,11 @@ TEST(win_quartus_tool_lookup_and_conversion)
 	CHECK(r.launched);
 	CHECK_EQ(r.exitCode, 0);
 	CHECK(fileExists(rbf));
+	const std::string svf = g_tmp + "\\converted test.svf";
+	DeleteFileW(widen(svf).c_str());
+	r = runProcess(cpf, buildSofToSvfArgs(sof, svf), nullptr);
+	CHECK_EQ(r.exitCode, 0);
+	CHECK(fileExists(svf));
 	auto bad = runProcess(cpf, {"--option=fail", "-c", sof, rbf}, nullptr);
 	CHECK_EQ(bad.exitCode, 3);
 

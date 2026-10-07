@@ -65,6 +65,7 @@ private:
 	std::string effectiveCable() const; // cable openFPGALoader will use
 	std::string blasterFirmware() const;
 	std::string autoCable(const std::string &board, const std::string &cable) const;
+	std::string matchConnectedBlaster(const std::string &requested, bool log = true);
 	std::string driverHint(const FailureInfo &info) const;
 	std::string selectedCable() const;
 	std::string bitstreamPath() const;

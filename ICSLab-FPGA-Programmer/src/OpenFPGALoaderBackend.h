@@ -207,9 +207,17 @@ bool isWinUsbService(const std::string &service);
 bool isQuartusSof(const std::string &path);
 // "C:\p\output_files\top.sof" -> "C:\p\output_files\top.rbf"
 std::string siblingRbf(const std::string &sofPath);
+// "...\top.sof" -> "...\top.svf"
+std::string siblingSvf(const std::string &sofPath);
 // quartus_cpf arguments for an uncompressed .rbf (JTAG configuration cannot
 // use compressed bitstreams).
 std::vector<std::string> buildSofToRbfArgs(const std::string &sof, const std::string &rbf);
+// quartus_cpf arguments for an SVF "program" file. Used for FPGA SRAM: the
+// SVF made by Quartus contains the configuration status (CONF_DONE) check,
+// which openFPGALoader's SVF player verifies, so a failed configuration is
+// reported as a failure. (openFPGALoader's own .rbf JTAG loader does not
+// check CONF_DONE.)
+std::vector<std::string> buildSofToSvfArgs(const std::string &sof, const std::string &svf);
 // Candidate locations of a Quartus tool (e.g. "quartus_cpf.exe").
 std::vector<std::string> quartusToolCandidates(const std::string &exeName,
 	const std::string &quartusRootDir, const std::vector<std::string> &quartusVersionDirs);
@@ -231,6 +239,7 @@ enum class FailureKind {
 	MultipleFpga,
 	BlasterFirmware, // USB-Blaster II firmware missing
 	SofConversion,   // .sof selected and it could not be converted
+	ConfigFailed,    // data sent, but the FPGA did not accept it (SVF check)
 	Unknown,
 };
 

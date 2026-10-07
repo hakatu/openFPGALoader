@@ -165,6 +165,7 @@ std::string friendlyBoardName(const std::string &board)
 		{"de10lite",        "Terasic DE10-Lite"},
 		{"de10nano",        "Terasic DE10-Nano"},
 		{"de1Soc",          "Terasic DE1-SoC"},
+		{"de0",             "Terasic DE0"},
 		{"tangnano9k",      "Sipeed Tang Nano 9K"},
 		{"tangnano20k",     "Sipeed Tang Nano 20K"},
 		{"ulx3s",           "Radiona ULX3S"},
@@ -191,8 +192,11 @@ std::vector<LabBoard> defaultLabBoards()
 		"de0nano\n"
 		"tangnano9k\n"
 		"cmoda7_35t\n"
-		"de2_standard = Terasic DE2-Standard | cable=usb-blasterII\n"
-		"de2_115 = Terasic DE2-115 | cable=usb-blaster\n");
+		"de2_115 = Terasic DE2-115 | cable=usb-blaster\n"
+		"de2_standard = Terasic DE2-Standard | cable=usb-blaster\n"
+		"de2 = Terasic DE2 / DE2-70 | cable=usb-blaster\n"
+		"de1 = Terasic DE1 | cable=usb-blaster\n"
+		"de1Soc = Terasic DE1-SoC\n");
 }
 
 /* ------------------------------------------------------------------------ */
@@ -878,6 +882,20 @@ std::string siblingRbf(const std::string &sofPath)
 	return sofPath.substr(0, sofPath.size() - 4) + ".rbf";
 }
 
+std::string siblingSvf(const std::string &sofPath)
+{
+	if (!isQuartusSof(sofPath))
+		return std::string();
+	return sofPath.substr(0, sofPath.size() - 4) + ".svf";
+}
+
+std::vector<std::string> buildSofToSvfArgs(const std::string &sof, const std::string &svf)
+{
+	// Same command as openFPGALoader's documentation (doc/vendors/intel.rst):
+	// 12 MHz TCK, 3.3 V JTAG, "p" = program operation.
+	return {"-c", "-q", "12.0MHz", "-g", "3.3", "-n", "p", sof, svf};
+}
+
 std::vector<std::string> buildSofToRbfArgs(const std::string &sof, const std::string &rbf)
 {
 	// Same command as openFPGALoader's documentation (doc/vendors/intel.rst)
@@ -982,6 +1000,15 @@ FailureInfo classifyResult(int exitCode, const std::string &rawOutput)
 		info.title = "Unable to communicate with the FPGA programmer.";
 		info.explanation = "No matching USB programmer was found.";
 		info.checks = kHardwareChecks;
+	} else if (has("isn't the one expected")) {
+		info.kind = FailureKind::ConfigFailed;
+		info.title = "The FPGA did not accept the bitstream.";
+		info.explanation = "The file was sent, but the FPGA's configuration check "
+			"(CONF_DONE) failed, so the design is not running.";
+		info.checks = {"the design was compiled for exactly this FPGA (device part number "
+				"in Quartus: Assignments > Device)",
+			"the selected board",
+			"board power and the USB cable (a disconnect during programming)"};
 	} else if (has("more than one FPGA found")) {
 		info.kind = FailureKind::MultipleFpga;
 		info.title = "More than one FPGA was found on the JTAG chain.";
@@ -1022,10 +1049,12 @@ FailureInfo sofNeedsConversionInfo(const std::string &sofPath)
 	info.explanation = "openFPGALoader needs a .rbf (or .svf) file, and Quartus is not "
 		"installed on this PC to convert \"" + fileBaseName(sofPath) + "\" automatically.";
 	info.checks = {
-		"on a PC with Quartus: File > Convert Programming Files > \"Raw Binary File (.rbf)\", "
-			"then select the .rbf here",
+		"on a PC with Quartus: File > Convert Programming Files > \"Serial Vector Format "
+			"(.svf)\" (FPGA SRAM) or \"Raw Binary File (.rbf)\" (Flash), then select that file here",
 		"or add to the project's .qsf file, then compile again and select "
-			"output_files\\" + fileBaseName(siblingRbf(sofPath)) + ":\r\n"
+			"output_files\\" + fileBaseName(siblingSvf(sofPath)) + " (FPGA SRAM) or "
+			"output_files\\" + fileBaseName(siblingRbf(sofPath)) + " (Flash):\r\n"
+			"      set_global_assignment -name GENERATE_SVF_FILE ON\r\n"
 			"      set_global_assignment -name GENERATE_RBF_FILE ON\r\n"
 			"      set_global_assignment -name ON_CHIP_BITSTREAM_DECOMPRESSION OFF",
 	};
@@ -1036,7 +1065,7 @@ FailureInfo sofConversionFailedInfo(int exitCode, const std::vector<std::string>
 {
 	FailureInfo info;
 	info.kind = FailureKind::SofConversion;
-	info.title = "Converting the .sof file to .rbf failed.";
+	info.title = "Converting the .sof file failed.";
 	info.explanation = "Quartus (quartus_cpf) reported an error (exit code " +
 		std::to_string(exitCode) + "). Nothing was programmed.";
 	if (!triedVersions.empty()) {

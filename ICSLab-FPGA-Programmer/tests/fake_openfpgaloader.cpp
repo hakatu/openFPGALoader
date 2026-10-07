@@ -35,14 +35,18 @@ int main()
 	int argc = 0;
 	wchar_t **argv = CommandLineToArgvW(GetCommandLineW(), &argc);
 	int exitCode = 0;
-	if (argc == 5 && !std::wcsncmp(argv[1], L"--option=", 9) && !std::wcscmp(argv[2], L"-c")) {
+	// quartus_cpf: "--option=x -c in out" (.rbf) or "-c -q f -g v -n p in out" (.svf)
+	const bool cpfRbf = argc == 5 && !std::wcsncmp(argv[1], L"--option=", 9) &&
+		!std::wcscmp(argv[2], L"-c");
+	const bool cpfSvf = argc == 10 && !std::wcscmp(argv[1], L"-c") && !std::wcscmp(argv[2], L"-q");
+	if (cpfRbf || cpfSvf) {
 		std::printf("Fake quartus_cpf: converting\n");
 		int rc = 0;
 		wchar_t self[MAX_PATH] = L"";
 		GetModuleFileNameW(nullptr, self, MAX_PATH);
 		if (!std::wcscmp(argv[1], L"--option=fail") || std::wcsstr(self, L"fail"))
 			rc = 3;
-		else if (!CopyFileW(argv[3], argv[4], FALSE))
+		else if (!CopyFileW(argv[argc - 2], argv[argc - 1], FALSE))
 			rc = 2;
 		LocalFree(argv);
 		return rc;

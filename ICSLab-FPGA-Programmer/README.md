@@ -55,22 +55,28 @@ openFPGALoader
 
 ## For lab instructors
 
-* **Distribution:** `ICSLab-FPGA-Programmer-v1.2.1-win64.zip`. Students
+* **Distribution:** `ICSLab-FPGA-Programmer-v1.3.0-win64.zip`. Students
   extract it anywhere (Desktop, Downloads, a USB stick) and run the `.exe`.
   No installation or administrator rights. An optional per-user installer
   (`ICSLab-FPGA-Programmer-Setup.exe`, Inno Setup) is built by CI.
-* **Quartus `.sof` files:** students can select the `.sof`. The application
-  uses an up-to-date `<top>.rbf` next to it if present, otherwise converts it
-  with Quartus's `quartus_cpf` (uncompressed `.rbf`, as JTAG configuration
-  requires). Every Quartus installation is found, on any local drive:
-  `<drive>:\intelFPGA*\<version>` and older Quartus II releases in
-  `<drive>:\altera*\<version>` (plus `QUARTUS_ROOTDIR` and `PATH`). They are
-  tried newest first; if a version cannot convert the file (e.g. a Cyclone II
-  `.sof` from the original DE2, supported only up to Quartus II 13.0 SP1) the
-  next older one is used. Tip: add `set_global_assignment -name GENERATE_RBF_FILE ON` and
-  `set_global_assignment -name ON_CHIP_BITSTREAM_DECOMPRESSION OFF` to the lab
-  template `.qsf` so every compile also writes the `.rbf` (works on PCs
-  without Quartus too).
+* **Quartus `.sof` files:** students can select the `.sof`.
+  * *FPGA SRAM*: the `.sof` is converted to **SVF** with Quartus's
+    `quartus_cpf -c -q 12.0MHz -g 3.3 -n p` (or an up-to-date `<top>.svf` next
+    to it is used). The SVF contains Quartus's configuration-status (CONF_DONE)
+    check, which openFPGALoader's SVF player verifies, so a design the FPGA
+    did not accept is reported as a failure. (openFPGALoader's own `.rbf`
+    JTAG loader does not check CONF_DONE and can report success although
+    the FPGA is not configured.)
+  * *Flash*: the `.sof` is converted to an uncompressed `.rbf`.
+  * Every Quartus installation is found, on any local drive:
+    `<drive>:\intelFPGA*\<version>` and older Quartus II releases in
+    `<drive>:\altera*\<version>` (plus `QUARTUS_ROOTDIR` and `PATH`), tried
+    newest first; if a version cannot convert the file (e.g. a Cyclone II
+    `.sof`, supported only up to Quartus II 13.0 SP1) the next older one is
+    used.
+  * Tip for PCs without Quartus: add `GENERATE_SVF_FILE ON`,
+    `GENERATE_RBF_FILE ON` and `ON_CHIP_BITSTREAM_DECOMPRESSION OFF`
+    (`set_global_assignment -name ...`) to the lab template `.qsf`.
 * **Lab board list:** edit `lab-boards.txt` next to the `.exe` to choose which
   boards appear first. All boards supported by openFPGALoader
   (`openFPGALoader --list-boards`, read at runtime) are listed below them.
@@ -159,7 +165,7 @@ ICSLab-FPGA-Programmer/release/
 │   ├── docs/, LICENSES/, lab-boards.txt
 │   ├── README.txt
 │   └── README-licenses.txt
-├── ICSLab-FPGA-Programmer-v1.2.1-win64.zip
+├── ICSLab-FPGA-Programmer-v1.3.0-win64.zip
 ├── SHA256SUMS.txt
 └── dependencies.txt          (DLL imports of both executables)
 ```

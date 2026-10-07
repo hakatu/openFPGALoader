@@ -31,11 +31,12 @@ Your FPGA must already be working in SRAM mode before you try Flash mode.
 ## Which file do I select?
 
 * **Vivado** (Xilinx/AMD): `<project>.runs/impl_1/<top>.bit`
-* **Quartus** (Intel, e.g. DE2 boards): `output_files/<top>.sof`.
+* **Quartus** (Intel, e.g. DE1/DE2 boards): `output_files/<top>.sof`.
   openFPGALoader cannot program `.sof` itself, so the application converts it
-  to `.rbf` automatically with Quartus (lab PCs with Quartus installed). If a
-  matching `.rbf` already exists next to the `.sof` it is used directly. On a
-  PC without Quartus you get a message explaining how to produce the `.rbf`.
+  with Quartus automatically: to `.svf` for FPGA SRAM (this format lets the
+  programmer check that the FPGA really accepted the design) and to `.rbf`
+  for Flash. A matching up-to-date `.svf`/`.rbf` next to the `.sof` is used
+  directly. On a PC without Quartus you get a message explaining what to do.
 * **Gowin**: `impl/pnr/<project>.fs`
 
 ## Detect Board

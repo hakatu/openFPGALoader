@@ -46,7 +46,7 @@ Only change the **JTAG interface** of the programmer. Never change the UART
 | Basys 3 (`basys3`), Nexys A7 (`nexys_a7_50/100`), Arty A7/S7 (`arty_*`), Cmod A7/S7 (`cmoda7_*`, `cmod_s7`), Zybo Z7 (`zybo_z7_*`) | FTDI FT2232 (`0403:6010`) | **"… (Interface 0)"**, e.g. "Digilent USB Device (Interface 0)" | WinUSB | "… (Interface 1)" = USB serial port |
 | Nexys Video (`nexysVideo`, cable `digilent_b`) | FTDI FT2232 (`0403:6010`) | **"… (Interface 1)"**. This board uses channel B for JTAG | WinUSB | "… (Interface 0)" |
 | Generic FT2232 boards (cable `ft2232`), e.g. Sipeed Tang Nano 9K (`tangnano9k`) | `0403:6010` | **"… (Interface 0)"**, e.g. "JTAG Debugger (Interface 0)" | WinUSB | "… (Interface 1)" = USB serial port |
-| Terasic DE10-Lite (`de10lite`), DE0-Nano (`de0nano`) | USB-Blaster (`09FB:6001`) | **"USB-Blaster"** (single interface) | WinUSB | n/a |
+| Terasic DE10-Lite (`de10lite`), DE0-Nano (`de0nano`), DE2-115, DE2-Standard, DE2, DE1 | USB-Blaster (`09FB:6001`) | **"USB-Blaster"** (single interface) | WinUSB | n/a |
 | USB-Blaster II boards (`de10nano`, `de1Soc`, …) | `09FB:6010` (before firmware) / `09FB:6810` | **"USB-Blaster II"** (both IDs) | WinUSB | n/a |
 
 USB-Blaster II also needs Intel's firmware file (`blaster_6810.hex` from a
@@ -104,9 +104,10 @@ If the automatic setup reports an error, do the same by hand: Device Manager
 The driver choice is stored per USB device instance: plugging the same
 board into another USB port may require running the setup again.
 
-**Not yet validated on hardware:** the USB Setup function was developed
-without access to a DE2 board or a Windows 11 PC. Try it on one lab PC
-first; the manual procedure above is the fallback.
+**Validation status:** tested by ICSLab on Windows 11 with a DE2 board
+(USB-Blaster 09FB:6001): after "Install WinUSB driver" the blaster shows
+"WinUSB driver - ready for openFPGALoader". USB-Blaster II has not been
+tested on hardware yet; the manual procedure above is the fallback.
 
 ## Installing WinUSB with Zadig (administrator rights required)
 
