@@ -47,7 +47,7 @@ Only change the **JTAG interface** of the programmer. Never change the UART
 | Nexys Video (`nexysVideo`, cable `digilent_b`) | FTDI FT2232 (`0403:6010`) | **"… (Interface 1)"**. This board uses channel B for JTAG | WinUSB | "… (Interface 0)" |
 | Generic FT2232 boards (cable `ft2232`), e.g. Sipeed Tang Nano 9K (`tangnano9k`) | `0403:6010` | **"… (Interface 0)"**, e.g. "JTAG Debugger (Interface 0)" | WinUSB | "… (Interface 1)" = USB serial port |
 | Terasic DE10-Lite (`de10lite`), DE0-Nano (`de0nano`), DE2-115, DE2-Standard, DE2, DE1 | USB-Blaster (`09FB:6001`) | **"USB-Blaster"** (single interface) | WinUSB | n/a |
-| USB-Blaster II boards (`de10nano`, `de1Soc`, …) | `09FB:6010` (before firmware) / `09FB:6810` | **"USB-Blaster II"** (both IDs) | WinUSB | n/a |
+| USB-Blaster II boards (`de10nano`, `de1Soc`, DE10-Standard, …) | `09FB:6010` (before firmware) / `09FB:6810` | **"USB-Blaster II"** (both IDs) | WinUSB | n/a |
 
 USB-Blaster II also needs Intel's firmware file (`blaster_6810.hex` from a
 Quartus installation); ICSLab FPGA Programmer passes it automatically

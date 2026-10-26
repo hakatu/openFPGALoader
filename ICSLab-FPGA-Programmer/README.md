@@ -55,7 +55,7 @@ openFPGALoader
 
 ## For lab instructors
 
-* **Distribution:** `ICSLab-FPGA-Programmer-v1.3.0-win64.zip`. Students
+* **Distribution:** `ICSLab-FPGA-Programmer-v1.3.1-win64.zip`. Students
   extract it anywhere (Desktop, Downloads, a USB stick) and run the `.exe`.
   No installation or administrator rights. An optional per-user installer
   (`ICSLab-FPGA-Programmer-Setup.exe`, Inno Setup) is built by CI.
@@ -165,7 +165,7 @@ ICSLab-FPGA-Programmer/release/
 │   ├── docs/, LICENSES/, lab-boards.txt
 │   ├── README.txt
 │   └── README-licenses.txt
-├── ICSLab-FPGA-Programmer-v1.3.0-win64.zip
+├── ICSLab-FPGA-Programmer-v1.3.1-win64.zip
 ├── SHA256SUMS.txt
 └── dependencies.txt          (DLL imports of both executables)
 ```

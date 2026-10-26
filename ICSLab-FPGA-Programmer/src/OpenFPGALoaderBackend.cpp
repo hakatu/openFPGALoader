@@ -196,7 +196,8 @@ std::vector<LabBoard> defaultLabBoards()
 		"de2_standard = Terasic DE2-Standard | cable=usb-blaster\n"
 		"de2 = Terasic DE2 / DE2-70 | cable=usb-blaster\n"
 		"de1 = Terasic DE1 | cable=usb-blaster\n"
-		"de1Soc = Terasic DE1-SoC\n");
+		"de1Soc = Terasic DE1-SoC\n"
+		"de10_standard = Terasic DE10-Standard | cable=usb-blasterII\n");
 }
 
 /* ------------------------------------------------------------------------ */

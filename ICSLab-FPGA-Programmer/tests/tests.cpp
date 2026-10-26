@@ -631,6 +631,7 @@ TEST(intel_lab_boards)
 	CHECK_EQ(cable["de1"], "usb-blaster");
 	CHECK_EQ(cable.count("de1Soc"), size_t(1)); // openFPGALoader board entry
 	CHECK_EQ(cable["de1Soc"], "");
+	CHECK_EQ(cable["de10_standard"], "usb-blasterII"); // Cyclone V SoC, on-board USB-Blaster II
 }
 
 TEST(strip_ansi)
