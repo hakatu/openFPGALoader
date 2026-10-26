@@ -1,0 +1,3 @@
+7ef4179c8b80448bd19d95f1d7715a80ac96ad9c79810a1cc8431d8a18209a32  openFPGALoader-GUI-v1.4.0-win64.zip
+7e631c96e487a99cd0dca2e694d1b1e2a8bdb486495971c86f17e18d936e3ee6  openFPGALoader-GUI/openFPGALoader GUI.exe
+a348e10b7447c9be263219239d4f463c6e322e34020ee1cfffdcb0f917d9147b  openFPGALoader-GUI/backend/openFPGALoader.exe

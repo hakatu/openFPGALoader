@@ -1,0 +1,15 @@
+openFPGALoader GUI.exe: PE32+ executable (GUI) x86-64 (stripped to external PDB), for MS Windows, 11 sections
+    imports ADVAPI32.dll
+    imports COMCTL32.dll
+    imports GDI32.dll
+    imports KERNEL32.dll
+    imports SETUPAPI.dll
+    imports SHELL32.dll
+    imports USER32.dll
+    imports comdlg32.dll
+    imports msvcrt.dll
+openFPGALoader.exe: PE32+ executable (console) x86-64 (stripped to external PDB), for MS Windows, 10 sections
+    imports KERNEL32.dll
+    imports WS2_32.dll
+    imports msvcrt.dll
+OK: only Windows system DLLs are imported (no extra DLLs to ship).

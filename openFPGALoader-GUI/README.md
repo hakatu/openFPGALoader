@@ -52,7 +52,7 @@ openFPGALoader
 | ![no hardware](docs/screenshots/02-no-hardware.png) | ![detect + details](docs/screenshots/03-detect-details.png) |
 | ![flash confirmation](docs/screenshots/04-flash-confirm.png) | ![backend missing](docs/screenshots/05-backend-missing.png) |
 
-| ![USB Setup](docs/screenshots/06-usb-setup.png) | ![DE2-Standard, firmware missing](docs/screenshots/07-de2-standard.png) |
+| ![USB Setup](docs/screenshots/06-usb-setup.png) | |
 | ![.sof converted automatically](docs/screenshots/08-sof-converted.png) | ![.sof without Quartus](docs/screenshots/09-sof-no-quartus.png) |
 
 (Screenshots taken under Wine. On Windows the controls use the native Windows 10/11 theme.)
