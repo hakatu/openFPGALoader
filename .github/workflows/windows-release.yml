@@ -1,18 +1,18 @@
-name: ICSLab FPGA Programmer - Windows release
+name: openFPGALoader GUI - Windows release
 
 on:
   push:
     branches: ['**']
-    tags: ['icslab-v*']
+    tags: ['gui-v*']
     paths:
-      - 'ICSLab-FPGA-Programmer/**'
+      - 'openFPGALoader-GUI/**'
       - 'src/**'
       - 'CMakeLists.txt'
       - 'cmake/**'
       - '.github/workflows/windows-release.yml'
   pull_request:
     paths:
-      - 'ICSLab-FPGA-Programmer/**'
+      - 'openFPGALoader-GUI/**'
       - 'src/**'
       - 'CMakeLists.txt'
       - 'cmake/**'
@@ -20,7 +20,7 @@ on:
   workflow_dispatch:
     inputs:
       ofl_source:
-        description: 'openFPGALoader sources: "pin" (use ICSLab-FPGA-Programmer/openfpgaloader.pin), "local" or "upstream"'
+        description: 'openFPGALoader sources: "pin" (use openFPGALoader-GUI/openfpgaloader.pin), "local" or "upstream"'
         default: 'pin'
         required: true
       ofl_ref:
@@ -56,24 +56,24 @@ jobs:
         env:
           RUN_TESTS: '0'            # Windows tests run natively in the next job
           CORRESPONDING_SOURCE: '1'
-        run: ICSLab-FPGA-Programmer/scripts/build-release.sh
+        run: openFPGALoader-GUI/scripts/build-release.sh
 
       - name: Upload release
         uses: actions/upload-artifact@v4
         with:
-          name: ICSLab-FPGA-Programmer-win64
+          name: openFPGALoader-GUI-win64
           path: |
-            ICSLab-FPGA-Programmer/release/*.zip
-            ICSLab-FPGA-Programmer/release/SHA256SUMS.txt
-            ICSLab-FPGA-Programmer/release/dependencies.txt
+            openFPGALoader-GUI/release/*.zip
+            openFPGALoader-GUI/release/SHA256SUMS.txt
+            openFPGALoader-GUI/release/dependencies.txt
 
       - name: Upload test binaries
         uses: actions/upload-artifact@v4
         with:
           name: tests-win64
           path: |
-            ICSLab-FPGA-Programmer/build-release/gui/icslab_tests.exe
-            ICSLab-FPGA-Programmer/build-release/gui/fake_openfpgaloader.exe
+            openFPGALoader-GUI/build-release/gui/oflgui_tests.exe
+            openFPGALoader-GUI/build-release/gui/fake_openfpgaloader.exe
 
   test-windows:
     name: Test on Windows
@@ -82,7 +82,7 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          name: ICSLab-FPGA-Programmer-win64
+          name: openFPGALoader-GUI-win64
           path: dist
       - uses: actions/download-artifact@v4
         with:
@@ -92,21 +92,21 @@ jobs:
       - name: Extract portable ZIP (into a path with spaces)
         shell: pwsh
         run: |
-          $zip = Get-ChildItem dist\ICSLab-FPGA-Programmer-v*-win64.zip | Select-Object -First 1
+          $zip = Get-ChildItem dist\openFPGALoader-GUI-v*-win64.zip | Select-Object -First 1
           Expand-Archive $zip.FullName -DestinationPath "C:\Lab Test\Student Name"
           Get-ChildItem -Recurse "C:\Lab Test\Student Name" | Select-Object -First 30 FullName
 
       - name: Unit + process + backend integration tests
         shell: pwsh
         run: |
-          $backend = "C:\Lab Test\Student Name\ICSLab-FPGA-Programmer\backend\openFPGALoader.exe"
-          & tests\icslab_tests.exe $backend
+          $backend = "C:\Lab Test\Student Name\openFPGALoader-GUI\backend\openFPGALoader.exe"
+          & tests\oflgui_tests.exe $backend
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Backend smoke test
         shell: pwsh
         run: |
-          $backend = "C:\Lab Test\Student Name\ICSLab-FPGA-Programmer\backend\openFPGALoader.exe"
+          $backend = "C:\Lab Test\Student Name\openFPGALoader-GUI\backend\openFPGALoader.exe"
           & $backend --Version
           & $backend --list-boards | Select-Object -First 5
           $global:LASTEXITCODE = 0
@@ -114,7 +114,7 @@ jobs:
       - name: GUI starts and stays responsive
         shell: pwsh
         run: |
-          $exe = "C:\Lab Test\Student Name\ICSLab-FPGA-Programmer\ICSLab FPGA Programmer.exe"
+          $exe = "C:\Lab Test\Student Name\openFPGALoader-GUI\openFPGALoader GUI.exe"
           $p = Start-Process -FilePath $exe -PassThru
           Start-Sleep -Seconds 8
           $p.Refresh()
@@ -131,28 +131,28 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: ICSLab-FPGA-Programmer-win64
-          path: ICSLab-FPGA-Programmer/release
+          name: openFPGALoader-GUI-win64
+          path: openFPGALoader-GUI/release
       - name: Build Setup.exe
         shell: pwsh
         run: |
-          Set-Location ICSLab-FPGA-Programmer
-          $zip = Get-ChildItem release\ICSLab-FPGA-Programmer-v*-win64.zip | Select-Object -First 1
+          Set-Location openFPGALoader-GUI
+          $zip = Get-ChildItem release\openFPGALoader-GUI-v*-win64.zip | Select-Object -First 1
           Expand-Archive $zip.FullName -DestinationPath release -Force
-          $ver = ($zip.Name -replace '^ICSLab-FPGA-Programmer-v(.*)-win64\.zip$', '$1')
+          $ver = ($zip.Name -replace '^openFPGALoader-GUI-v(.*)-win64\.zip$', '$1')
           if (-not (Get-Command iscc -ErrorAction SilentlyContinue)) {
             choco install innosetup --no-progress -y
             $env:Path += ";${env:ProgramFiles(x86)}\Inno Setup 6"
           }
-          iscc /DAppVersion=$ver installer\icslab-fpga-programmer.iss
+          iscc /DAppVersion=$ver installer\openfpgaloader-gui.iss
       - uses: actions/upload-artifact@v4
         with:
-          name: ICSLab-FPGA-Programmer-Setup
-          path: ICSLab-FPGA-Programmer/release/ICSLab-FPGA-Programmer-Setup.exe
+          name: openFPGALoader-GUI-Setup
+          path: openFPGALoader-GUI/release/openFPGALoader-GUI-Setup.exe
 
   publish:
     name: Attach to GitHub release
-    if: startsWith(github.ref, 'refs/tags/icslab-v')
+    if: startsWith(github.ref, 'refs/tags/gui-v')
     needs: [build, test-windows, installer]
     runs-on: ubuntu-24.04
     steps:

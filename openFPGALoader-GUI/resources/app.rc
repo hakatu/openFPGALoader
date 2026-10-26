@@ -1,0 +1,59 @@
+// SPDX-License-Identifier: Apache-2.0
+// openFPGALoader GUI - Windows resources
+
+#include <winver.h>
+#include <winuser.h>
+#include "../src/resource.h"
+
+IDI_APPICON ICON "app.ico"
+
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "app.manifest"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION    OFLGUI_VERSION_MAJOR,OFLGUI_VERSION_MINOR,OFLGUI_VERSION_PATCH,0
+ PRODUCTVERSION OFLGUI_VERSION_MAJOR,OFLGUI_VERSION_MINOR,OFLGUI_VERSION_PATCH,0
+ FILEFLAGSMASK  0x3fL
+ FILEFLAGS      0x0L
+ FILEOS         VOS_NT_WINDOWS32
+ FILETYPE       VFT_APP
+ FILESUBTYPE    0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName",      "haka @ ICSLab HCMUT"
+            VALUE "Author",           "haka @ ICSLab HCMUT"
+            VALUE "FileDescription",  "Simple FPGA programming utility powered by openFPGALoader"
+            VALUE "FileVersion",      OFLGUI_VERSION_STR
+            VALUE "InternalName",     "OpenFPGALoaderGUI"
+            VALUE "LegalCopyright",   "Created by haka @ ICSLab HCMUT. Uses openFPGALoader (Apache-2.0), an independent open-source project."
+            VALUE "OriginalFilename", "openFPGALoader GUI.exe"
+            VALUE "ProductName",      "openFPGALoader GUI"
+            VALUE "ProductVersion",   OFLGUI_VERSION_STR
+            VALUE "Comments",         "openFPGALoader GUI uses openFPGALoader as its FPGA programming backend. openFPGALoader is an independent open-source project: https://github.com/trabucayre/openFPGALoader"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+IDD_USBSETUP DIALOGEX 0, 0, 340, 268
+STYLE DS_MODALFRAME | DS_CENTER | DS_SHELLFONT | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "USB Setup (lab instructor)"
+FONT 9, "Segoe UI", 400, 0, 0x1
+BEGIN
+    LTEXT           "Intel USB-Blaster devices connected to this PC:", -1, 7, 7, 326, 9
+    EDITTEXT        IDC_US_DEVICES, 7, 18, 326, 50, ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL
+    PUSHBUTTON      "&Refresh", IDC_US_REFRESH, 7, 72, 56, 15
+    PUSHBUTTON      "&Install WinUSB driver", IDC_US_INSTALL, 69, 72, 128, 15
+    PUSHBUTTON      "Re&store original driver", IDC_US_RESTORE, 203, 72, 130, 15
+    LTEXT           "Install WinUSB binds the WinUSB driver built into Windows (signed by Microsoft) to the USB-Blaster, replacing Intel's driver that often fails on Windows 11 (yellow mark in Device Manager). openFPGALoader then works; Quartus no longer sees this blaster until you click Restore. Needs administrator rights once per PC.", IDC_US_INFO, 7, 92, 326, 42
+    LTEXT           "USB-Blaster II firmware (blaster_6810.hex, part of the Quartus installation):", -1, 7, 140, 326, 9
+    EDITTEXT        IDC_US_FIRMWARE, 7, 151, 266, 14, ES_READONLY | ES_AUTOHSCROLL
+    PUSHBUTTON      "&Locate...", IDC_US_LOCATE, 279, 151, 54, 14
+    EDITTEXT        IDC_US_RESULT, 7, 172, 326, 68, ES_MULTILINE | ES_READONLY | ES_AUTOVSCROLL | WS_VSCROLL
+    DEFPUSHBUTTON   "Close", IDCANCEL, 279, 246, 54, 15
+END

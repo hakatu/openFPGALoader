@@ -2,7 +2,7 @@
 /*
  * Copyright (C) 2022 Greg Davill <greg.davill@gmail.com>
  *
- * Modified 2026 by ICSLab: keep native Windows paths unchanged and fall back
+ * Modified 2026 for the openFPGALoader Windows GUI build: keep native Windows paths unchanged and fall back
  * to the original path when cygpath is unavailable (plain Windows without
  * MSYS2/Cygwin), so spiOverJtag bridges are found on student PCs.
  */

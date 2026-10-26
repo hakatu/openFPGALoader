@@ -1,5 +1,10 @@
 # openFPGALoader
 
+> **This fork adds a Windows GUI and a ready-to-run Windows build.**
+> See [`openFPGALoader-GUI/`](openFPGALoader-GUI/README.md) and the
+> *Releases* page (`openFPGALoader-GUI-v<version>-win64.zip`). Everything else
+> is upstream openFPGALoader: https://github.com/trabucayre/openFPGALoader
+
 <p align="right">
   <a title="Documentation" href="https://trabucayre.github.io/openFPGALoader"><img src="https://img.shields.io/website.svg?label=trabucayre.github.io%2FopenFPGALoader&longCache=true&style=flat-square&url=http%3A%2F%2Ftrabucayre.github.io%2FopenFPGALoader%2Findex.html&logo=GitHub"></a><!--
   -->

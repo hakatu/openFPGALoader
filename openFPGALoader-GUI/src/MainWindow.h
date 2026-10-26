@@ -1,0 +1,159 @@
+// SPDX-License-Identifier: Apache-2.0
+// openFPGALoader GUI - main window (Win32).
+
+#pragma once
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <windows.h>
+
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "OpenFPGALoaderBackend.h"
+#include "ProcessRunner.h"
+#include "Settings.h"
+#include "DriverSetup.h"
+
+namespace oflgui {
+
+class MainWindow {
+public:
+	MainWindow(HINSTANCE hInst);
+	~MainWindow();
+	bool create(int nCmdShow, const std::string &initialBitstream = std::string());
+	HWND hwnd() const { return _hwnd; }
+
+private:
+	enum class Task { None, LoadLists, Detect, Program };
+
+	struct BoardEntry {
+		std::string key;      // saved in settings; "" = generic
+		std::string boardArg; // openFPGALoader board for "-b" ("" = none)
+		std::string cable;    // cable from lab-boards.txt ("" = board default)
+		std::string label;    // friendly name
+		bool separator = false;
+	};
+
+	// Messages posted from the worker thread to the UI thread.
+	struct WorkerLine { std::string text; };
+	struct WorkerDone {
+		Task task = Task::None;
+		std::vector<ProcessResult> runs;
+		bool converted = false;   // a .sof conversion was attempted
+		ProcessResult convert;    // its (last) result
+		std::vector<std::string> convertTried; // Quartus versions tried
+		std::string summary;  // detect summary
+		bool ok = false;
+	};
+
+	static LRESULT CALLBACK wndProc(HWND, UINT, WPARAM, LPARAM);
+	LRESULT handle(UINT, WPARAM, LPARAM);
+
+	void createControls();
+	void layout();
+	void resizeToContent();
+	int S(int v) const { return MulDiv(v, _dpi, 96); }
+
+	void populateBoards();
+	void populateCables();
+	const BoardEntry &selectedEntry() const;
+	std::string selectedBoard() const;
+	std::string requestCable() const;   // value for "-c" ("" = none)
+	std::string effectiveCable() const; // cable openFPGALoader will use
+	std::string blasterFirmware() const;
+	std::string autoCable(const std::string &board, const std::string &cable) const;
+	std::string matchConnectedBlaster(const std::string &requested, bool log = true);
+	std::string driverHint(const FailureInfo &info) const;
+	std::string selectedCable() const;
+	std::string bitstreamPath() const;
+	bool flashSelected() const;
+	void setBitstream(const std::string &path);
+
+	void onBoardChanged();
+	void onBrowse();
+	void onDetect();
+	void onProgram();
+	void onToggleDetails();
+	void onAbout();
+	void onUsbSetup();
+	void refreshUsbSetup(HWND dlg);
+	static INT_PTR CALLBACK usbSetupProc(HWND, UINT, WPARAM, LPARAM);
+	void onWorkerLine(WorkerLine *line);
+	void onWorkerDone(WorkerDone *done);
+
+	void startWorker(Task task, std::vector<std::vector<std::string>> runs,
+		std::string detectBoard = std::string(), std::string detectCable = std::string(),
+		std::string firmware = std::string(),
+		std::vector<std::string> convertExes = std::vector<std::string>(),
+		std::vector<std::string> convertArgs = std::vector<std::string>());
+	static DWORD WINAPI workerMain(LPVOID param);
+
+	void setBusy(bool busy);
+	enum class Tone { Neutral, Busy, Good, Bad };
+	void setStatus(const std::string &text, Tone tone);
+	void showReadySummary();
+	std::string targetSummary() const;
+	void appendLog(const std::string &text);
+	void setProgressMarquee(bool on);
+	void setProgress(double percent);
+	void saveSettings();
+
+	HINSTANCE _hInst;
+	HWND _hwnd = nullptr;
+	int _dpi = 96;
+	int _baseHeight = 560;
+
+	HWND _title = nullptr;
+	HWND _lblBoard = nullptr, _cbBoard = nullptr;
+	HWND _lblCable = nullptr, _cbCable = nullptr;
+	HWND _lblFile = nullptr, _edFile = nullptr, _btnBrowse = nullptr;
+	HWND _lblMode = nullptr, _rbSram = nullptr, _rbFlash = nullptr;
+	HWND _btnDetect = nullptr;
+	HWND _sep1 = nullptr, _lblStatus = nullptr, _edStatus = nullptr, _progress = nullptr;
+	HWND _btnProgram = nullptr;
+	HWND _sep2 = nullptr, _btnDetails = nullptr, _btnAbout = nullptr, _footer = nullptr;
+	HWND _btnUsbSetup = nullptr;
+	bool _driverBusy = false;
+	HWND _edLog = nullptr;
+
+	HFONT _fontUi = nullptr, _fontTitle = nullptr, _fontBig = nullptr;
+	HFONT _fontMono = nullptr, _fontSmall = nullptr;
+	HBRUSH _bgBrush = nullptr, _statusBrush = nullptr;
+
+	bool _detailsVisible = false;
+	bool _busy = false;
+	bool _marquee = false;
+	Task _task = Task::None;
+	Tone _tone = Tone::Neutral;
+	std::string _lastPhase;
+	std::string _initialBitstream;
+
+	std::string _exeDir;
+	std::string _backend;      // "" when missing
+	std::string _backendVersion;
+	std::vector<BoardInfo> _boards;
+	std::vector<std::string> _cables;
+	std::vector<LabBoard> _labBoards;
+	std::vector<BoardEntry> _boardEntries;
+
+	Settings _settings;
+	std::string _settingsPath;
+
+	// worker state
+	HANDLE _worker = nullptr;
+	struct WorkerJob {
+		HWND hwnd;
+		Task task;
+		std::string exe;
+		std::vector<std::vector<std::string>> runs;
+		std::string detectBoard, detectCable;
+		std::string firmware; // USB-Blaster II firmware ("" if not needed)
+		std::vector<std::string> convertExes; // quartus_cpf.exe candidates for a .sof
+		std::vector<std::string> convertArgs;
+	};
+};
+
+} // namespace oflgui
