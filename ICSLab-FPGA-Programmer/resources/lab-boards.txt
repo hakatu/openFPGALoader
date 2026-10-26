@@ -29,4 +29,6 @@ de2_standard  = Terasic DE2-Standard   | cable=usb-blaster
 de2           = Terasic DE2 / DE2-70   | cable=usb-blaster
 de1           = Terasic DE1            | cable=usb-blaster
 de1Soc        = Terasic DE1-SoC
+# DE10-Standard (5CSXFC6D6F31C6): FPGA SRAM only - openFPGALoader has no
+# flash bridge for Cyclone V SX SoC devices.
 de10_standard = Terasic DE10-Standard | cable=usb-blasterII
